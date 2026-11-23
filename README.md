@@ -26,7 +26,7 @@ pip install -r requirements.txt
 3. Install Python 3.10+ and run:
    `pip install -r requirements.txt`
 4. Start:
-   `uvicorn main:app --host 0.0.0.0 --port 8000`
+   uvicorn main:app --reload --host 127.0.0.1 --port 8000
 5. Open `http://127.0.0.1:8000`; on a phone on the same Wi-Fi use `http://LAPTOP_IP:8000`.
 
 The backend reads Consentium `/getData` and `/getData?recents=true`, caches feeds, and exposes `/api/telemetry`.

@@ -1,104 +1,562 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Consentium Gas Rover | Live Map</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
-:root{color-scheme:dark;--bg:#0b1220;--panel:#131e30;--muted:#9aabc2;--line:#26364d;--blue:#3984ff}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#edf3fc;font:14px system-ui,Arial}
-header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 18px;background:#111c2d;border-bottom:1px solid var(--line)}
-h1{font-size:17px;margin:0}small,.muted{color:var(--muted)}main{display:grid;grid-template-columns:340px 1fr;min-height:calc(100vh - 54px)}
-aside{padding:13px;overflow:auto;max-height:calc(100vh - 54px)}#map{height:calc(100vh - 54px);min-height:520px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:11px}
-.card h2{font-size:14px;margin:0 0 10px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.metric{background:#0d1727;border-radius:9px;padding:10px}.metric span{display:block;color:var(--muted);font-size:11px}.metric b{font-size:19px}
-label{display:block;color:var(--muted);font-size:12px;margin:8px 0 4px}input,select,button{width:100%;border:1px solid #34465f;border-radius:8px;padding:9px;background:#0d1727;color:#edf3fc}
-button{background:#245fc1;border:0;cursor:pointer;margin-top:8px;font-weight:600}.status{font-size:12px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e0a33a;margin-right:6px}.ok{background:#26c281}.bad{background:#ed6262}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
-.swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
-@media(max-width:800px){main{grid-template-columns:1fr}#map{height:52vh;min-height:340px;grid-row:1}aside{max-height:none}.card{margin-bottom:9px}}
-</style></head>
-<body>
-<header><h1>Consentium IoT · Gas Monitoring Rover</h1><div class="status" id="status"><span class="dot"></span>Connecting to backend…</div></header>
-<main><aside>
-<section class="card"><h2>Live sensor telemetry</h2><div class="grid">
-<div class="metric"><span>MQ-4 raw ADC</span><b id="mq4">—</b></div>
-<div class="metric"><span>MQ-7 raw ADC</span><b id="mq7">—</b></div>
-<div class="metric"><span>Temperature</span><b id="temp">—</b></div>
-<div class="metric"><span>Humidity</span><b id="hum">—</b></div>
-<div class="metric"><span>X east (m)</span><b id="x">—</b></div>
-<div class="metric"><span>Y north (m)</span><b id="y">—</b></div>
-<div class="metric"><span>Heading</span><b id="heading">—</b></div>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Consentium IoT | Gas Monitoring Rover</title>
 
-</div></section>
-<section class="card"><h2>Map setup</h2>
-<label>Starting latitude</label><input id="lat" type="number" step="0.0000001" placeholder="e.g. 22.5726">
-<label>Starting longitude</label><input id="lon" type="number" step="0.0000001" placeholder="e.g. 88.3639">
-<label>Initial heading (degrees clockwise from north)</label><input id="heading0" type="number" value="0" min="0" max="359.9" step="0.1">
-<button id="setOrigin">Set map origin</button><small>Choose the rover's actual starting point on the map. This browser setting is used to convert cloud X/Y telemetry to map coordinates.</small>
-</section>
-<section class="card"><h2>Heatmap layer</h2>
-<label>Gas channel</label><select id="layer"><option value="mq4_raw">MQ-4 response</option><option value="mq7_raw">MQ-7 response</option></select>
-<div class="legend" style="margin-top:10px"><span><i class="swatch" style="background:#22c55e"></i>Lower response</span><span><i class="swatch" style="background:#facc15"></i>Medium</span><span><i class="swatch" style="background:#ef4444"></i>Higher</span></div>
-<button id="center">Center on rover</button><button id="reload" style="background:#40516b">Reload cloud history</button>
-</section>
-<section class="card"><h2>Cloud status</h2><div class="status" id="cloud">Waiting for telemetry…</div><small id="count">0 feeds loaded</small><p class="muted">Data is read from Consentium IoT by the backend. API keys are not sent to this browser.</p></section>
-<section class="card"><small>This firmware uploads MQ-4 and MQ-7 only (no MQ-11 input is configured). Heat intensity is raw sensor response unless the gas sensors have been calibrated. MQ sensor readings are not automatically verified ppm. GPS-free map coordinates are dead-reckoning estimates and drift over time.</small></section>
-</aside><div id="map"></div></main>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-<script>
-const map=L.map('map').setView([20.5937,78.9629],5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-let marker=null,trail=L.polyline([],{color:'#267cff',weight:3}).addTo(map),heat=L.heatLayer([],{radius:27,blur:20,maxZoom:18}).addTo(map),lastData=[];
-const $=id=>document.getElementById(id);
-function number(v){let n=Number(v);return Number.isFinite(n)?n:null}
-function fmt(v,d=2){let n=number(v);return n===null?'—':n.toFixed(d)}
-function getOrigin(){return {lat:number(localStorage.getItem('originLat')),lon:number(localStorage.getItem('originLon')),heading:number(localStorage.getItem('originHeading'))||0}}
-function geo(feed){
-  if(feed.latitude!=null&&feed.longitude!=null)return [feed.latitude,feed.longitude];
-  let o=getOrigin();if(o.lat===null||o.lon===null||feed.x_m==null||feed.y_m==null)return null;
-  let h=(o.heading||0)*Math.PI/180;
-  // Firmware local axes: X east and Y north. Rotate by initial map heading.
-  let east=feed.x_m*Math.cos(h)+feed.y_m*Math.sin(h);
-  let north=-feed.x_m*Math.sin(h)+feed.y_m*Math.cos(h);
-  let lat=o.lat+north/111320;
-  let lon=o.lon+east/(111320*Math.cos(o.lat*Math.PI/180));
-  return [lat,lon];
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0b1220;
+  --panel: #131e30;
+  --muted: #9aabc2;
+  --line: #26364d;
+  --blue: #3984ff;
 }
-function render(data){
-  const f=data.latest|| (data.feeds||[]).slice(-1)[0];
-  $('count').textContent=(data.feeds||[]).length+' feeds loaded';
-  $('cloud').textContent=data.last_error?'Cloud error: '+data.last_error:(f?'Latest feed: '+(f.timestamp||'timestamp unavailable'):'No telemetry feeds returned');
-  $('status').innerHTML=data.last_error?'<span class="dot bad"></span>Cloud API error':'<span class="dot ok"></span>Backend connected';
-  if(!f)return;
-  $('mq4').textContent=fmt(f.mq4_raw,0);$('mq7').textContent=fmt(f.mq7_raw,0);
-  $('temp').textContent=fmt(f.temperature,1)+' °C';$('hum').textContent=fmt(f.humidity,1)+' %';
-  $('x').textContent=fmt(f.x_m);$('y').textContent=fmt(f.y_m);$('heading').textContent=fmt(f.heading_deg,1)+'°';
-  const layer=$('layer').value, points=[], path=[];
-  for(const item of (data.feeds||[])){
-    const p=geo(item),v=number(item[layer]);
-    if(!p)continue;
-    path.push(p);
-    if(v!==null){ // robust relative scaling; ADC maximum typically 4095 on ESP32
-      const intensity=Math.max(0.03,Math.min(1,v/4095));
-      points.push([p[0],p[1],intensity]);
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: #edf3fc;
+  font: 14px system-ui, Arial, sans-serif;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  background: #111c2d;
+  border-bottom: 1px solid var(--line);
+}
+h1 { font-size: 17px; margin: 0; }
+small, .muted { color: var(--muted); }
+main {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  min-height: calc(100vh - 54px);
+}
+aside {
+  padding: 13px;
+  overflow: auto;
+  max-height: calc(100vh - 54px);
+}
+#map {
+  height: calc(100vh - 54px);
+  min-height: 520px;
+  width: 100%;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px;
+  margin-bottom: 11px;
+}
+.card h2 { font-size: 14px; margin: 0 0 10px; }
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.metric {
+  background: #0d1727;
+  border-radius: 9px;
+  padding: 10px;
+  min-width: 0;
+}
+.metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.metric b {
+  display: block;
+  font-size: 19px;
+  overflow-wrap: anywhere;
+}
+label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 8px 0 4px;
+}
+input, select, button {
+  width: 100%;
+  border: 1px solid #34465f;
+  border-radius: 8px;
+  padding: 9px;
+  background: #0d1727;
+  color: #edf3fc;
+}
+button {
+  background: #245fc1;
+  border: 0;
+  cursor: pointer;
+  margin-top: 8px;
+  font-weight: 600;
+}
+button.secondary { background: #40516b; }
+.status { font-size: 12px; }
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e0a33a;
+  margin-right: 6px;
+}
+.dot.ok { background: #26c281; }
+.dot.bad { background: #ed6262; }
+.legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+.help-text {
+  display: block;
+  line-height: 1.5;
+  margin-top: 7px;
+}
+@media (max-width: 800px) {
+  main { grid-template-columns: 1fr; }
+  #map {
+    height: 52vh;
+    min-height: 340px;
+    grid-row: 1;
+  }
+  aside { max-height: none; }
+  .card { margin-bottom: 9px; }
+}
+</style>
+</head>
+
+<body>
+<header>
+  <h1>Consentium IoT · Gas Monitoring Rover</h1>
+  <div class="status" id="status">
+    <span class="dot"></span>Connecting to backend…
+  </div>
+</header>
+
+<main>
+<aside>
+  <section class="card">
+    <h2>Live sensor telemetry</h2>
+    <div class="grid">
+      <div class="metric"><span>MQ-4 raw ADC</span><b id="mq4">—</b></div>
+      <div class="metric"><span>MQ-7 raw ADC</span><b id="mq7">—</b></div>
+      <div class="metric"><span>Temperature</span><b id="temp">—</b></div>
+      <div class="metric"><span>Humidity</span><b id="hum">—</b></div>
+      <div class="metric"><span>X east (m)</span><b id="x">—</b></div>
+      <div class="metric"><span>Y north (m)</span><b id="y">—</b></div>
+      <div class="metric"><span>Heading</span><b id="heading">—</b></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Map setup</h2>
+    <label for="lat">Starting latitude</label>
+    <input id="lat" type="number" step="0.0000001" placeholder="e.g. 22.5726">
+
+    <label for="lon">Starting longitude</label>
+    <input id="lon" type="number" step="0.0000001" placeholder="e.g. 88.3639">
+
+    <label for="heading0">Initial heading (degrees clockwise from north)</label>
+    <input id="heading0" type="number" value="0" min="0" max="359.9" step="0.1">
+
+    <button id="setOrigin">Set map origin</button>
+    <small class="help-text">
+      Enter the real starting coordinates of the rover. The browser uses this
+      origin with the ESP32 X/Y dead-reckoning coordinates to place readings
+      on OpenStreetMap.
+    </small>
+  </section>
+
+  <section class="card">
+    <h2>Heatmap layer</h2>
+    <label for="layer">Gas channel</label>
+    <select id="layer">
+      <option value="mq4_raw">MQ-4 response</option>
+      <option value="mq7_raw">MQ-7 response</option>
+    </select>
+
+    <div class="legend">
+      <span><i class="swatch" style="background:#22c55e"></i>Lower response</span>
+      <span><i class="swatch" style="background:#facc15"></i>Medium</span>
+      <span><i class="swatch" style="background:#ef4444"></i>Higher</span>
+    </div>
+
+    <button id="center">Center on rover</button>
+    <button id="reload" class="secondary">Reload cloud history</button>
+  </section>
+
+  <section class="card">
+    <h2>Cloud status</h2>
+    <div class="status" id="cloud">Waiting for telemetry…</div>
+    <small id="count">0 feeds loaded</small>
+    <small class="help-text" id="lastUpdate"></small>
+  </section>
+
+  <section class="card">
+    <small class="help-text">
+      This firmware configuration uploads MQ-4 and MQ-7. Heat intensity uses
+      raw ADC response (0–4095), not calibrated gas concentration in ppm.
+      GPS-free position is estimated using IMU and wheel encoders; wheel slip
+      and sensor drift can cause accumulated position error.
+    </small>
+  </section>
+</aside>
+
+<div id="map"></div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<script>
+"use strict";
+
+// -------------------- Map initialization --------------------
+const map = L.map("map").setView([20.5937, 78.9629], 5);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: "&copy; OpenStreetMap contributors"
+}).addTo(map);
+
+const roverTrail = L.polyline([], {
+  color: "#267cff",
+  weight: 3
+}).addTo(map);
+
+const heatLayer = L.heatLayer([], {
+  radius: 27,
+  blur: 20,
+  maxZoom: 18,
+  // Explicit green -> yellow -> red heat intensity gradient.
+  gradient: {
+    0.20: "#22c55e",
+    0.55: "#facc15",
+    1.00: "#ef4444"
+  }
+}).addTo(map);
+
+let roverMarker = null;
+let lastData = null;
+let initialMapFitDone = false;
+
+const $ = (id) => document.getElementById(id);
+
+// IMPORTANT: do not turn null/empty values into zero.
+// Number(null) is 0 in JavaScript, which would create false coordinates.
+function number(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatValue(value, decimals = 2) {
+  const n = number(value);
+  return n === null ? "—" : n.toFixed(decimals);
+}
+
+function getOrigin() {
+  return {
+    lat: number(localStorage.getItem("originLat")),
+    lon: number(localStorage.getItem("originLon")),
+    heading: number(localStorage.getItem("originHeading")) ?? 0
+  };
+}
+
+// The ESP32 firmware's xEastM and yNorthM are already east/north world
+// offsets. Do not rotate them by the initial heading a second time.
+function getFeedCoordinates(feed) {
+  const lat = number(feed.latitude);
+  const lon = number(feed.longitude);
+
+  // Prefer coordinates calculated and uploaded by the ESP32, if available.
+  if (lat !== null && lon !== null &&
+      Math.abs(lat) <= 90 && Math.abs(lon) <= 180 &&
+      !(lat === 0 && lon === 0)) {
+    return [lat, lon];
+  }
+
+  const origin = getOrigin();
+  const xEast = number(feed.x_m);
+  const yNorth = number(feed.y_m);
+
+  if (origin.lat === null || origin.lon === null ||
+      xEast === null || yNorth === null) {
+    return null;
+  }
+
+  const latitude = origin.lat + yNorth / 111320;
+  const cosLatitude = Math.cos(origin.lat * Math.PI / 180);
+
+  if (Math.abs(cosLatitude) < 0.000001) {
+    return null;
+  }
+
+  const longitude = origin.lon + xEast / (111320 * cosLatitude);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+      Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+    return null;
+  }
+
+  return [latitude, longitude];
+}
+
+// -------------------- Status and telemetry rendering --------------------
+function setStatus(kind, message) {
+  const dotClass = kind === "ok" ? "ok" : kind === "bad" ? "bad" : "";
+  $("status").innerHTML =
+    '<span class="dot ' + dotClass + '"></span>' + message;
+}
+
+function renderTelemetry(data) {
+  const feeds = Array.isArray(data.feeds) ? data.feeds : [];
+  const latest = data.latest || feeds[feeds.length - 1] || null;
+
+  $("count").textContent = feeds.length + " feeds loaded";
+
+  if (data.last_error) {
+    $("cloud").textContent = "Consentium error: " + data.last_error;
+  } else if (latest) {
+    $("cloud").textContent =
+      "Consentium connected · Latest feed: " +
+      (latest.timestamp || "timestamp unavailable");
+  } else {
+    $("cloud").textContent =
+      "Backend connected, but no telemetry feeds were returned.";
+  }
+
+  $("lastUpdate").textContent = data.last_success
+    ? "Backend last successful poll: " + data.last_success
+    : "";
+
+  if (!latest) {
+    $("mq4").textContent = "—";
+    $("mq7").textContent = "—";
+    $("temp").textContent = "—";
+    $("hum").textContent = "—";
+    $("x").textContent = "—";
+    $("y").textContent = "—";
+    $("heading").textContent = "—";
+    return;
+  }
+
+  $("mq4").textContent = formatValue(latest.mq4_raw, 0);
+  $("mq7").textContent = formatValue(latest.mq7_raw, 0);
+
+  const temperature = number(latest.temperature);
+  const humidity = number(latest.humidity);
+
+  $("temp").textContent =
+    temperature === null ? "—" : temperature.toFixed(1) + " °C";
+  $("hum").textContent =
+    humidity === null ? "—" : humidity.toFixed(1) + " %";
+
+  $("x").textContent = formatValue(latest.x_m);
+  $("y").textContent = formatValue(latest.y_m);
+
+  const heading = number(latest.heading_deg);
+  $("heading").textContent =
+    heading === null ? "—" : heading.toFixed(1) + "°";
+
+  renderMap(data, latest);
+}
+
+// -------------------- Heatmap and rover position --------------------
+function renderMap(data, latest) {
+  const feeds = Array.isArray(data.feeds) ? data.feeds : [];
+  const selectedGas = $("layer").value;
+
+  const heatPoints = [];
+  const trailPoints = [];
+
+  for (const feed of feeds) {
+    const position = getFeedCoordinates(feed);
+    if (!position) continue;
+
+    trailPoints.push(position);
+
+    const rawReading = number(feed[selectedGas]);
+
+    if (rawReading !== null) {
+      // Scale ESP32 12-bit ADC response to Leaflet heat intensity.
+      const intensity = Math.max(0, Math.min(1, rawReading / 4095));
+
+      // Ignore exact zero so that zero readings do not create visible heat.
+      if (intensity > 0) {
+        heatPoints.push([
+          position[0],
+          position[1],
+          intensity
+        ]);
+      }
     }
   }
-  heat.setLatLngs(points);
-  trail.setLatLngs(path);
-  const p=geo(f);
-  if(p){
-    if(!marker)marker=L.circleMarker(p,{radius:8,color:'#fff',weight:2,fillColor:'#267cff',fillOpacity:1}).addTo(map).bindPopup('Estimated rover position');
-    else marker.setLatLng(p);
-    if(!window.didInitialFit){map.setView(p,18);window.didInitialFit=true;}
+
+  heatLayer.setLatLngs(heatPoints);
+  roverTrail.setLatLngs(trailPoints);
+
+  const currentPosition = getFeedCoordinates(latest);
+
+  if (currentPosition) {
+    if (!roverMarker) {
+      roverMarker = L.circleMarker(currentPosition, {
+        radius: 8,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: "#267cff",
+        fillOpacity: 1
+      }).addTo(map).bindPopup("Estimated rover position");
+    } else {
+      roverMarker.setLatLng(currentPosition);
+    }
+
+    if (!initialMapFitDone) {
+      map.setView(currentPosition, 18);
+      initialMapFitDone = true;
+    }
+  } else if (trailPoints.length === 0) {
+    $("cloud").textContent +=
+      " · Set map origin and upload X/Y position telemetry to plot heat.";
   }
 }
-async function refresh(){try{let r=await fetch('/api/telemetry',{cache:'no-store'});let d=await r.json();lastData=d;render(d)}catch(e){$('status').innerHTML='<span class="dot bad"></span>Backend unreachable'}}
-$('setOrigin').onclick=()=>{let lat=number($('lat').value),lon=number($('lon').value),h=number($('heading0').value)||0;if(lat===null||lon===null||Math.abs(lat)>90||Math.abs(lon)>180){alert('Enter valid latitude and longitude');return}localStorage.setItem('originLat',lat);localStorage.setItem('originLon',lon);localStorage.setItem('originHeading',h);window.didInitialFit=false;refresh()};
-$('layer').onchange=()=>render(lastData);
-$('center').onclick=()=>{if(marker)map.setView(marker.getLatLng(),18)};
-$('reload').onclick=async()=>{try{await fetch('/api/reload',{method:'POST'});await refresh()}catch(e){alert('Could not reload Consentium history')}};
-setInterval(refresh,3000);refresh();
-</script></body></html>
+
+// -------------------- Backend API --------------------
+async function refreshTelemetry() {
+  try {
+    const response = await fetch("/api/telemetry", {
+      method: "GET",
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error("Backend returned HTTP " + response.status);
+    }
+
+    const data = await response.json();
+
+    lastData = data;
+
+    if (data.last_error) {
+      setStatus("bad", "Backend connected · Consentium API error");
+    } else if (data.configured === false) {
+      setStatus("bad", "Backend connected · API keys not configured");
+    } else {
+      setStatus("ok", "Backend connected");
+    }
+
+    renderTelemetry(data);
+
+  } catch (error) {
+    console.error("Telemetry refresh failed:", error);
+    setStatus("bad", "Backend unreachable");
+    $("cloud").textContent = error.message;
+  }
+}
+
+// -------------------- User controls --------------------
+$("setOrigin").addEventListener("click", () => {
+  const latitude = number($("lat").value);
+  const longitude = number($("lon").value);
+  const heading = number($("heading0").value);
+
+  if (latitude === null || longitude === null ||
+      Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+    alert("Please enter valid starting latitude and longitude.");
+    return;
+  }
+
+  if (heading === null || heading < 0 || heading >= 360) {
+    alert("Initial heading must be from 0 to less than 360 degrees.");
+    return;
+  }
+
+  localStorage.setItem("originLat", String(latitude));
+  localStorage.setItem("originLon", String(longitude));
+  localStorage.setItem("originHeading", String(heading));
+
+  initialMapFitDone = false;
+
+  // The ESP32's X/Y coordinate system is already east/north.
+  // The heading is used by the ESP32 when its origin is initialized.
+  map.setView([latitude, longitude], 18);
+
+  if (lastData) {
+    renderTelemetry(lastData);
+  }
+
+  alert("Map origin saved in this browser.");
+});
+
+$("layer").addEventListener("change", () => {
+  if (lastData) renderTelemetry(lastData);
+});
+
+$("center").addEventListener("click", () => {
+  if (roverMarker) {
+    map.setView(roverMarker.getLatLng(), 18);
+  } else {
+    const origin = getOrigin();
+    if (origin.lat !== null && origin.lon !== null) {
+      map.setView([origin.lat, origin.lon], 18);
+    } else {
+      alert("Set the map origin first.");
+    }
+  }
+});
+
+$("reload").addEventListener("click", async () => {
+  const button = $("reload");
+  button.disabled = true;
+  button.textContent = "Reloading…";
+
+  try {
+    const response = await fetch("/api/reload", { method: "POST" });
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || "History reload failed");
+    }
+    await refreshTelemetry();
+  } catch (error) {
+    console.error("History reload failed:", error);
+    $("cloud").textContent = "Reload error: " + error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Reload cloud history";
+  }
+});
+
+// Restore saved origin fields when this browser is reopened.
+const savedOrigin = getOrigin();
+if (savedOrigin.lat !== null) $("lat").value = savedOrigin.lat;
+if (savedOrigin.lon !== null) $("lon").value = savedOrigin.lon;
+$("heading0").value = savedOrigin.heading;
+
+// Refresh the dashboard every 3 seconds. The backend polls Consentium
+// independently according to POLL_SECONDS in its .env file.
+refreshTelemetry();
+setInterval(refreshTelemetry, 3000);
+</script>
+</body>
+</html>
