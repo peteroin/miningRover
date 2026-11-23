@@ -3,157 +3,553 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Consentium IoT | Gas Monitoring Rover</title>
-
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131e30'/%3E%3Ccircle cx='20' cy='46' r='7' fill='%239aabc2'/%3E%3Ccircle cx='44' cy='46' r='7' fill='%239aabc2'/%3E%3Crect x='16' y='28' width='32' height='14' rx='4' fill='%233984ff'/%3E%3Crect x='28' y='20' width='8' height='10' rx='2' fill='%233984ff'/%3E%3Ccircle cx='32' cy='16' r='4' fill='%2326c281'/%3E%3Cpath d='M28 8c2-3 6-3 8 0M26 4c3-4 9-4 12 0' fill='none' stroke='%23e0a33a' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<title>Gas Monitoring Rover</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-
 <style>
-:root {
-  color-scheme: dark;
-  --bg: #0b1220;
-  --panel: #131e30;
-  --muted: #9aabc2;
-  --line: #26364d;
-  --blue: #3984ff;
+:root{color-scheme:dark;--bg:#0b1220;--panel:#131e30;--muted:#9aabc2;--line:#26364d;--blue:#3984ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#edf3fc;font:14px system-ui,Arial,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:calc(13px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 13px calc(18px + env(safe-area-inset-left));background:#111c2d;border-bottom:1px solid var(--line)}
+h1{font-size:17px;margin:0}
+small,.muted{color:var(--muted)}
+main{display:grid;grid-template-columns:350px minmax(0,1fr);min-height:calc(100vh - 54px)}
+aside{padding:13px;overflow:auto;max-height:calc(100vh - 54px)}
+#map{height:calc(100vh - 54px);min-height:520px;width:100%}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:11px}
+.card h2{font-size:14px;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.metric{background:#0d1727;border-radius:9px;padding:10px;min-width:0}
+.metric span{display:block;color:var(--muted);font-size:11px}
+.metric b{display:block;font-size:19px;overflow-wrap:anywhere}
+label{display:block;color:var(--muted);font-size:12px;margin:8px 0 4px}
+input,select,button{width:100%;border:1px solid #34465f;border-radius:8px;padding:9px;background:#0d1727;color:#edf3fc}
+button{background:#245fc1;border:0;cursor:pointer;margin-top:8px;font-weight:600}
+button.secondary{background:#40516b}
+button:disabled{opacity:.6;cursor:wait}
+.status{font-size:12px;line-height:1.5}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e0a33a;margin-right:6px}
+.dot.ok{background:#26c281}.dot.bad{background:#ed6262}
+.help{display:block;line-height:1.5;margin-top:7px;color:var(--muted)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:10px}
+.swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
+.thresholds{font-size:11px;line-height:1.6;color:var(--muted);margin-top:8px;overflow-wrap:anywhere}
+input[type=range]{padding:0;accent-color:#3984ff}
+/* Responsive layouts: desktop, tablet, phone and narrow embedded screens */
+html,body{width:100%;min-height:100%;overflow-x:hidden}
+body{-webkit-text-size-adjust:100%;overscroll-behavior-y:contain}
+button,select,input{font:inherit}
+button,select{min-height:42px}
+input{min-height:40px;max-width:100%}
+button{touch-action:manipulation}
+#map{min-width:0}
+main{min-width:0}
+aside{min-width:0;overscroll-behavior:contain}
+.card{min-width:0}
+.metric{overflow:hidden}
+@media(max-width:1100px){
+  main{grid-template-columns:310px minmax(0,1fr)}
+  aside{padding:10px}
 }
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: #edf3fc;
-  font: 14px system-ui, Arial, sans-serif;
+@media(max-width:800px){
+  header{padding:11px 13px;align-items:flex-start}
+  h1{font-size:15px;line-height:1.35}
+  main{display:flex;flex-direction:column;min-height:0}
+  #map{order:0;width:100%;height:55vh;height:55dvh;min-height:320px;max-height:620px}
+  aside{order:1;width:100%;max-height:none;overflow:visible;padding:10px}
+  .card{margin-bottom:10px;padding:12px}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 18px;
-  background: #111c2d;
-  border-bottom: 1px solid var(--line);
+@media(max-width:480px){
+  header{gap:8px;padding:10px}
+  h1{font-size:14px;max-width:65%}
+  .status{font-size:11px;text-align:right}
+  #map{height:48vh;height:48dvh;min-height:280px}
+  aside{padding:8px}
+  .card{padding:10px;border-radius:10px}
+  .card h2{font-size:13px}
+  .metric{padding:8px}
+  .metric b{font-size:17px}
+  .row{grid-template-columns:1fr}
+  input,select,button{font-size:14px}
+  .legend{gap:8px}
 }
-h1 { font-size: 17px; margin: 0; }
-small, .muted { color: var(--muted); }
-main {
-  display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  min-height: calc(100vh - 54px);
+@media(max-width:360px){
+  #map{min-height:250px}
+  .grid{gap:6px}
+  .metric span{font-size:10px}
+  .metric b{font-size:15px}
 }
-aside {
-  padding: 13px;
-  overflow: auto;
-  max-height: calc(100vh - 54px);
+@media(orientation:landscape) and (max-height:550px) and (max-width:950px){
+  main{display:grid;grid-template-columns:minmax(250px,34%) minmax(0,1fr)}
+  aside{order:0;max-height:calc(100vh - 54px);overflow:auto}
+  #map{order:0;height:calc(100vh - 54px);min-height:260px}
 }
-#map {
-  height: calc(100vh - 54px);
-  min-height: 520px;
-  width: 100%;
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
-.card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 13px;
-  margin-bottom: 11px;
+
+/* ===== Aesthetic refresh: refined dark telemetry console ===== */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+:root{
+  color-scheme:dark;
+  --bg:#080d18;
+  --panel:rgba(17,27,45,.92);
+  --panel-2:#101c30;
+  --muted:#91a3bc;
+  --line:rgba(148,169,199,.15);
+  --blue:#55a5ff;
+  --cyan:#48dfd0;
+  --text:#edf5ff;
+  --shadow:0 14px 36px rgba(0,0,0,.22);
 }
-.card h2 { font-size: 14px; margin: 0 0 10px; }
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+*{box-sizing:border-box}
+html{background:var(--bg);scroll-behavior:smooth}
+body{
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(37,99,235,.14),transparent 36rem),
+    radial-gradient(ellipse at 100% 12%,rgba(20,184,166,.09),transparent 32rem),
+    var(--bg);
+  color:var(--text);
+  font-family:'DM Sans',Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  letter-spacing:.005em;
 }
-.metric {
-  background: #0d1727;
-  border-radius: 9px;
-  padding: 10px;
-  min-width: 0;
+header{
+  position:relative;
+  z-index:500;
+  min-height:66px;
+  padding:14px 22px;
+  background:rgba(8,15,28,.88);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 8px 28px rgba(0,0,0,.16);
+  backdrop-filter:blur(18px);
 }
-.metric span {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
+h1{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-family:'Space Grotesk','DM Sans',sans-serif;
+  font-size:18px;
+  font-weight:700;
+  letter-spacing:-.035em;
 }
-.metric b {
-  display: block;
-  font-size: 19px;
-  overflow-wrap: anywhere;
+h1:before{
+  content:"";
+  width:10px;height:10px;border-radius:50%;
+  background:var(--cyan);
+  box-shadow:0 0 0 5px rgba(72,223,208,.11),0 0 18px rgba(72,223,208,.55);
 }
-label {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  margin: 8px 0 4px;
+.status{color:#b9c9dd;font-weight:600}
+.dot{box-shadow:0 0 12px currentColor}
+main{gap:0}
+aside{
+  padding:16px;
+  scrollbar-width:thin;
+  scrollbar-color:#344966 transparent;
 }
-input, select, button {
-  width: 100%;
-  border: 1px solid #34465f;
-  border-radius: 8px;
-  padding: 9px;
-  background: #0d1727;
-  color: #edf3fc;
+.card{
+  position:relative;
+  overflow:hidden;
+  padding:16px;
+  margin-bottom:13px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:linear-gradient(145deg,rgba(20,33,54,.96),rgba(12,22,38,.96));
+  box-shadow:var(--shadow);
+  transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease;
 }
-button {
-  background: #245fc1;
-  border: 0;
-  cursor: pointer;
-  margin-top: 8px;
-  font-weight: 600;
+.card:hover{
+  border-color:rgba(85,165,255,.32);
+  box-shadow:0 16px 38px rgba(0,0,0,.28);
 }
-button.secondary { background: #40516b; }
-.status { font-size: 12px; }
-.dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #e0a33a;
-  margin-right: 6px;
+.card h2{
+  display:flex;align-items:center;gap:9px;
+  margin:0 0 13px;
+  color:#f2f7ff;
+  font-family:'Space Grotesk','DM Sans',sans-serif;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.045em;
+  text-transform:uppercase;
 }
-.dot.ok { background: #26c281; }
-.dot.bad { background: #ed6262; }
-.legend {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 10px;
+.card h2:before{
+  content:"";
+  width:3px;height:15px;border-radius:4px;
+  background:linear-gradient(180deg,var(--cyan),var(--blue));
+  box-shadow:0 0 12px rgba(72,223,208,.35);
 }
-.swatch {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  margin-right: 4px;
+.metric{
+  padding:12px;
+  border:1px solid rgba(148,169,199,.10);
+  border-radius:12px;
+  background:linear-gradient(145deg,rgba(8,18,33,.92),rgba(15,29,48,.92));
 }
-.help-text {
-  display: block;
-  line-height: 1.5;
-  margin-top: 7px;
+.metric span{
+  margin-bottom:5px;
+  color:#91a6c1;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.075em;
+  text-transform:uppercase;
 }
-@media (max-width: 800px) {
-  main { grid-template-columns: 1fr; }
-  #map {
-    height: 52vh;
-    min-height: 340px;
-    grid-row: 1;
+.metric b{
+  color:#f4f9ff;
+  font-family:'Space Grotesk',sans-serif;
+  font-size:21px;
+  letter-spacing:-.035em;
+  font-variant-numeric:tabular-nums;
+}
+label{
+  color:#a9bad0;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.035em;
+}
+input,select{
+  min-height:42px;
+  border:1px solid rgba(148,169,199,.2);
+  border-radius:10px;
+  background:#0a1526;
+  color:#edf5ff;
+  outline:none;
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+input:focus,select:focus{
+  border-color:rgba(72,223,208,.75);
+  box-shadow:0 0 0 3px rgba(72,223,208,.10);
+  background:#0c1a2e;
+}
+input[type=range]{accent-color:var(--cyan);cursor:pointer}
+input[type=file]{padding:8px;font-size:12px}
+button{
+  min-height:42px;
+  border:1px solid rgba(85,165,255,.28);
+  border-radius:10px;
+  background:linear-gradient(135deg,#2478db,#2355ad);
+  color:white;
+  font-weight:700;
+  letter-spacing:.01em;
+  box-shadow:0 7px 18px rgba(35,100,190,.18);
+  transition:transform .16s ease,filter .16s ease,box-shadow .16s ease;
+}
+button:hover{
+  filter:brightness(1.12);
+  transform:translateY(-1px);
+  box-shadow:0 10px 22px rgba(35,100,190,.28);
+}
+button:active{transform:translateY(0) scale(.99)}
+button.secondary{
+  border:1px solid rgba(148,169,199,.18);
+  background:linear-gradient(135deg,#263b58,#1a2a41);
+  color:#dbe8f8;
+  box-shadow:none;
+}
+.help,.muted,small{color:var(--muted)}
+.thresholds{
+  padding:10px 11px;
+  border:1px solid rgba(72,223,208,.14);
+  border-radius:10px;
+  background:rgba(10,31,43,.58);
+  color:#a9c9d1;
+  font-variant-numeric:tabular-nums;
+}
+.legend{padding:9px 10px;border-radius:10px;background:rgba(5,14,26,.45)}
+#map{
+  background:#101a29;
+  border-left:1px solid var(--line);
+}
+.leaflet-container{font-family:'DM Sans',sans-serif}
+.leaflet-control-zoom a{
+  background:#102039!important;
+  color:#eaf4ff!important;
+  border-color:rgba(148,169,199,.22)!important;
+}
+.leaflet-control-attribution{
+  background:rgba(8,15,28,.78)!important;
+  color:#a9bad0!important;
+}
+.leaflet-control-attribution a{color:#73c9ff!important}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{
+  background:#12233a;color:#edf5ff;
+}
+@media(max-width:800px){
+  header{padding:12px 15px}
+  aside{padding:12px}
+  #map{border-left:0;border-bottom:1px solid var(--line)}
+}
+@media(max-width:480px){
+  header{min-height:58px}
+  h1{font-size:15px}
+  .card{border-radius:14px;padding:13px}
+  .metric b{font-size:19px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+}
+
+
+/* ===== Appearance modes: system (default), dark and light ===== */
+.header-actions{display:flex;align-items:center;gap:10px}
+.theme-label{margin:0;color:var(--muted);font-size:11px;white-space:nowrap}
+#themeMode{width:auto;min-width:104px;min-height:36px;padding:7px 30px 7px 10px;font-size:12px}
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#eef3f9;
+  --panel:rgba(255,255,255,.96);
+  --panel-2:#fff;
+  --muted:#61738c;
+  --line:rgba(65,87,117,.18);
+  --text:#17263b;
+}
+html[data-theme="light"] body{
+  background:
+    radial-gradient(ellipse at 8% 0%,rgba(59,130,246,.10),transparent 36rem),
+    radial-gradient(ellipse at 100% 12%,rgba(20,184,166,.08),transparent 32rem),
+    #eef3f9;
+  color:#17263b;
+}
+html[data-theme="light"] header{
+  background:rgba(255,255,255,.9);
+  border-bottom-color:rgba(65,87,117,.16);
+  box-shadow:0 8px 28px rgba(31,52,82,.08);
+}
+html[data-theme="light"] h1{color:#14243a}
+html[data-theme="light"] .status{color:#526780}
+html[data-theme="light"] .card{
+  background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(244,248,253,.98));
+  border-color:rgba(65,87,117,.15);
+  box-shadow:0 12px 30px rgba(31,52,82,.08);
+}
+html[data-theme="light"] .card h2{color:#1b2c43}
+html[data-theme="light"] .metric{
+  background:linear-gradient(145deg,#f7faff,#edf3fa);
+  border-color:rgba(65,87,117,.12);
+}
+html[data-theme="light"] .metric span,
+html[data-theme="light"] label,
+html[data-theme="light"] .help,
+html[data-theme="light"] small,
+html[data-theme="light"] .muted{color:#61738c}
+html[data-theme="light"] .metric b{color:#15263d}
+html[data-theme="light"] input,
+html[data-theme="light"] select{
+  background:#fff;color:#17263b;border-color:#cbd6e4;
+}
+html[data-theme="light"] input:focus,
+html[data-theme="light"] select:focus{background:#fff}
+html[data-theme="light"] button.secondary{
+  background:linear-gradient(135deg,#e5edf7,#d8e3f0);
+  color:#233952;border-color:#cbd6e4;
+}
+html[data-theme="light"] .thresholds{
+  background:#edf8f8;border-color:#cce9e7;color:#416a70;
+}
+html[data-theme="light"] .legend{background:#f1f5fa}
+html[data-theme="light"] #map{background:#e7edf5;border-color:#d4deea}
+html[data-theme="light"] .leaflet-control-zoom a{
+  background:#fff!important;color:#20334d!important;border-color:#ccd7e5!important;
+}
+html[data-theme="light"] .leaflet-control-attribution{
+  background:rgba(255,255,255,.88)!important;color:#526780!important;
+}
+html[data-theme="light"] .leaflet-control-attribution a{color:#1769aa!important}
+html[data-theme="light"] .leaflet-popup-content-wrapper,
+html[data-theme="light"] .leaflet-popup-tip{
+  background:#fff;color:#17263b;
+}
+@media(max-width:800px){
+  .header-actions{gap:7px;flex-wrap:wrap;justify-content:flex-end}
+  .theme-label{display:none}
+}
+@media(max-width:480px){
+  #themeMode{min-width:88px;min-height:34px;font-size:11px}
+}
+
+
+/* Groq AI assistant */
+.ai-intro{font-size:12px;line-height:1.55;color:var(--muted);margin:0 0 10px}
+.ai-chat{display:flex;flex-direction:column;gap:9px;max-height:330px;overflow:auto;padding:3px 2px 8px}
+.ai-msg{max-width:94%;padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-msg.assistant{align-self:flex-start;background:rgba(72,223,208,.09);border:1px solid rgba(72,223,208,.17);color:var(--text)}
+.ai-msg.user{align-self:flex-end;background:rgba(57,132,255,.16);border:1px solid rgba(85,165,255,.22);color:var(--text)}
+.ai-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:end}
+.ai-compose textarea{width:100%;min-height:70px;max-height:140px;resize:vertical;padding:10px;border:1px solid rgba(148,169,199,.2);border-radius:10px;background:#0a1526;color:#edf5ff;font:inherit;font-size:12px}
+.ai-compose textarea:focus{outline:none;border-color:rgba(72,223,208,.75);box-shadow:0 0 0 3px rgba(72,223,208,.10)}
+.ai-compose button{width:76px;margin:0}
+.ai-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.ai-suggestions button{width:auto;min-height:30px;padding:6px 9px;margin:0;border:1px solid var(--line);background:rgba(80,110,150,.12);box-shadow:none;color:var(--muted);font-size:10px}
+html[data-theme="light"] .ai-msg.assistant{color:#20334a;background:#eaf8f6}
+html[data-theme="light"] .ai-msg.user{color:#19345b;background:#e8f1ff}
+html[data-theme="light"] .ai-compose textarea{background:#fff;color:#17263b;border-color:#cbd6e4}
+html[data-theme="light"] .ai-suggestions button{background:#f1f5fa;color:#526780;border-color:#d6e0eb}
+
+
+/* Floating Groq assistant launcher and chat panel */
+.ai-widget{
+  position:fixed;right:24px;bottom:92px;z-index:1200;
+  display:none;flex-direction:column;width:min(390px,calc(100vw - 28px));
+  max-height:min(620px,calc(100dvh - 125px));overflow:hidden;
+  padding:0;border:1px solid rgba(85,165,255,.25);border-radius:18px;
+  background:var(--panel);box-shadow:0 24px 70px rgba(0,0,0,.42);
+  backdrop-filter:blur(22px);
+}
+.ai-widget.open{display:flex}
+.ai-widget-header{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px 15px;border-bottom:1px solid var(--line);
+  background:linear-gradient(120deg,rgba(39,105,184,.18),rgba(72,223,208,.08));
+}
+.ai-widget-header>div{display:grid;grid-template-columns:24px auto;align-items:center}
+.ai-widget-header strong{font:700 14px 'Space Grotesk',sans-serif}
+.ai-widget-header small{grid-column:2;color:var(--muted);font-size:10px}
+.ai-spark{grid-row:1/3;color:var(--cyan);font-size:20px}
+.ai-close{
+  width:32px;min-height:32px;height:32px;padding:0;margin:0;border-radius:50%;
+  background:rgba(120,145,175,.13);color:var(--text);font-size:22px;
+  line-height:1;box-shadow:none;border:1px solid var(--line)
+}
+.ai-widget .ai-intro{padding:12px 15px 0;margin:0}
+.ai-widget .ai-suggestions{padding:0 14px;margin:10px 0}
+.ai-widget .ai-chat{min-height:120px;max-height: min(330px,42dvh);padding:10px 14px;overflow-y:auto}
+.ai-widget .ai-compose{padding:0 14px 10px}
+.ai-widget #aiStatus{display:block;padding:0 15px 12px;font-size:10px}
+.ai-msg{white-space:normal;line-height:1.6}
+.ai-msg p{margin:0 0 7px}
+.ai-msg p:last-child{margin-bottom:0}
+.ai-msg h3{font-size:12px;margin:9px 0 5px;color:var(--cyan)}
+.ai-msg ul,.ai-msg ol{margin:5px 0 7px;padding-left:19px}
+.ai-msg li{margin:3px 0}
+.ai-msg strong{font-weight:700;color:inherit}
+.ai-msg code{font-family:ui-monospace,monospace;font-size:11px;padding:1px 4px;border-radius:4px;background:rgba(120,145,175,.16)}
+.ai-msg.assistant{max-width:100%;border-radius:12px}
+.ai-msg.user{max-width:90%}
+.ai-fab{
+  position:fixed;right:24px;bottom:24px;z-index:1201;
+  display:grid;place-items:center;width:54px;height:54px;min-height:54px;
+  padding:0;margin:0;border-radius:50%;border:1px solid rgba(116,220,255,.5);
+  background:linear-gradient(145deg,#36a4d9,#2863c8 72%);
+  color:#fff;font-size:25px;box-shadow:0 9px 28px rgba(35,115,210,.42),0 0 0 5px rgba(72,160,230,.10);
+}
+.ai-fab:hover{transform:translateY(-2px) scale(1.04)}
+.ai-fab.is-open{background:linear-gradient(145deg,#33445e,#1b2b43);font-size:24px}
+html[data-theme="light"] .ai-widget{background:#fff;border-color:#d5e1ef;box-shadow:0 24px 65px rgba(31,52,82,.22)}
+html[data-theme="light"] .ai-widget-header{background:linear-gradient(120deg,#eef5ff,#effaf8)}
+html[data-theme="light"] .ai-close{color:#263b55;background:#edf2f8}
+@media(max-width:600px){
+ .ai-widget{right:12px;bottom:82px;width:calc(100vw - 24px);max-height:calc(100dvh - 105px);border-radius:16px}
+ .ai-widget .ai-chat{max-height:36dvh}
+ .ai-fab{right:17px;bottom:17px;width:52px;height:52px;min-height:52px}
+}
+
+
+/* Laptop/desktop-only sidebar control:
+   open = four-line menu at sidebar top-right;
+   closed = arrow at the vertical middle of the map edge. */
+.sidebar-edge-toggle{display:none}
+@media(min-width:801px){
+  main{grid-template-columns:350px minmax(0,1fr);transition:grid-template-columns .24s ease}
+  #dashboardSidebar{
+    position:relative;
+    min-width:0;
+    opacity:1;
+    transition:opacity .18s ease,padding .24s ease;
   }
-  aside { max-height: none; }
-  .card { margin-bottom: 9px; }
+  .sidebar-edge-toggle{
+    display:flex;
+    position:absolute;
+    top:16px;
+    right:16px;
+    z-index:700;
+    width:38px;
+    min-width:38px;
+    height:36px;
+    min-height:36px;
+    margin:0;
+    padding:7px 9px;
+    align-items:center;
+    justify-content:center;
+    border:1px solid rgba(85,165,255,.32);
+    border-radius:10px;
+    background:linear-gradient(135deg,#2478db,#2355ad);
+    color:#fff;
+    box-shadow:0 5px 16px rgba(0,0,0,.2);
+  }
+  .sidebar-hamburger{display:flex;width:18px;flex-direction:column;gap:3px}
+  .sidebar-hamburger i{
+    display:block;width:100%;height:2px;border-radius:2px;
+    background:#fff;
+  }
+  .sidebar-hamburger i:nth-child(2){width:75%}
+  .sidebar-hamburger i:nth-child(3){width:90%}
+  .sidebar-open-arrow{display:none;font-size:24px;line-height:1}
+  main.sidebar-collapsed{grid-template-columns:0 minmax(0,1fr)}
+  main.sidebar-collapsed #dashboardSidebar{
+    position:relative;
+    padding:0;
+    opacity:1;
+    overflow:visible;
+    pointer-events:none;
+    z-index:600;
+  }
+  main.sidebar-collapsed #dashboardSidebar > :not(.sidebar-edge-toggle){
+    visibility:hidden;
+  }
+  main.sidebar-collapsed #dashboardSidebar .sidebar-edge-toggle{
+    display:flex;
+    position:absolute;
+    top:50%;
+    right:-19px;
+    transform:translateY(-50%);
+    width:38px;
+    min-width:38px;
+    height:48px;
+    min-height:48px;
+    padding:0;
+    pointer-events:auto;
+    border-radius:0 12px 12px 0;
+    border-left:0;
+    background:linear-gradient(135deg,#2478db,#2355ad);
+  }
+  main.sidebar-collapsed #dashboardSidebar .sidebar-hamburger{display:none}
+  main.sidebar-collapsed #dashboardSidebar .sidebar-open-arrow{display:block}
+  main.sidebar-collapsed #map{border-left:0}
 }
+/* Phones and tablets do not show a sidebar toggle. */
+@media(max-width:800px){
+  .sidebar-edge-toggle{display:none!important}
+  main.sidebar-collapsed{display:flex}
+  main.sidebar-collapsed #dashboardSidebar{
+    display:block;
+    opacity:1;
+    padding:10px;
+    overflow:visible;
+    pointer-events:auto;
+  }
+}
+
 </style>
 </head>
-
 <body>
 <header>
-  <h1>Consentium IoT · Gas Monitoring Rover</h1>
-  <div class="status" id="status">
-    <span class="dot"></span>Connecting to backend…
+  <h1>Gas Monitoring Rover</h1>
+  <div class="header-actions">
+    <label class="theme-label" for="themeMode">Appearance</label>
+    <select id="themeMode" aria-label="Choose appearance">
+      <option value="system">System</option>
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+    <div class="status" id="status"><span class="dot"></span>Connecting to backend…</div>
   </div>
 </header>
-
 <main>
-<aside>
+<aside id="dashboardSidebar">
+  <button type="button" id="sidebarToggle" class="sidebar-toggle sidebar-edge-toggle" aria-controls="dashboardSidebar" aria-expanded="true" title="Collapse dashboard sidebar">
+    <span class="sidebar-hamburger" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    <span class="sidebar-open-arrow" aria-hidden="true">›</span>
+  </button>
   <section class="card">
     <h2>Live sensor telemetry</h2>
     <div class="grid">
@@ -171,392 +567,721 @@ button.secondary { background: #40516b; }
     <h2>Map setup</h2>
     <label for="lat">Starting latitude</label>
     <input id="lat" type="number" step="0.0000001" placeholder="e.g. 22.5726">
-
     <label for="lon">Starting longitude</label>
     <input id="lon" type="number" step="0.0000001" placeholder="e.g. 88.3639">
-
     <label for="heading0">Initial heading (degrees clockwise from north)</label>
     <input id="heading0" type="number" value="0" min="0" max="359.9" step="0.1">
-
     <button id="setOrigin">Set map origin</button>
-    <small class="help-text">
-      Enter the real starting coordinates of the rover. The browser uses this
-      origin with the ESP32 X/Y dead-reckoning coordinates to place readings
-      on OpenStreetMap.
-    </small>
+    <small class="help">Enter the real starting coordinates of the rover. These are used with ESP32 X/Y dead-reckoning coordinates.</small>
   </section>
 
   <section class="card">
     <h2>Heatmap layer</h2>
-    <label for="layer">Gas channel</label>
-    <select id="layer">
-      <option value="mq4_raw">MQ-4 response</option>
-      <option value="mq7_raw">MQ-7 response</option>
+    <label for="mapSource">Map data source</label>
+    <select id="mapSource">
+      <option value="live">Live Consentium cloud</option>
+      <option value="csv">Uploaded CSV dataset</option>
     </select>
+    <label for="layer">Heatmap parameter</label>
+    <select id="layer">
+      <option value="mq4_raw">MQ-4 raw ADC</option>
+      <option value="mq7_raw">MQ-7 raw ADC</option>
+      <option value="temperature">DHT11 temperature (°C)</option>
+      <option value="humidity">DHT11 humidity (%)</option>
+    </select>
+    <small class="help" id="parameterHelp">Live cloud supports MQ-4, MQ-7 and DHT11 temperature/humidity when enabled in ESP32 firmware.</small>
 
-    <div class="legend">
-      <span><i class="swatch" style="background:#22c55e"></i>Lower response</span>
-      <span><i class="swatch" style="background:#facc15"></i>Medium</span>
-      <span><i class="swatch" style="background:#ef4444"></i>Higher</span>
-    </div>
+    <label for="palette">Heatmap colour scheme</label>
+    <select id="palette">
+      <option value="greenRed">Green → Yellow → Red</option>
+      <option value="bluePurple">Blue → Cyan → Purple</option>
+      <option value="purpleYellow">Purple → Pink → Yellow</option>
+      <option value="blueRed">Blue → White → Red</option>
+      <option value="cyanOrange">Cyan → Green → Orange</option>
+      <option value="mono">Black → Blue → White</option>
+    </select>
+    <div class="legend" id="heatLegend"></div>
 
-    <button id="center">Center on rover</button>
+    <label for="radius">Heat spot radius: <span id="radiusValue">8</span> px</label>
+    <input id="radius" type="range" min="3" max="30" value="8">
+    <label for="blur">Heat blur: <span id="blurValue">5</span> px</label>
+    <input id="blur" type="range" min="1" max="25" value="5">
+
+    <label for="scaleMode">Intensity scaling</label>
+    <select id="scaleMode">
+      <option value="percentile">Robust scaling (5th–95th percentile)</option>
+      <option value="minmax">Full dataset min–max</option>
+    </select>
+    <div id="thresholds" class="thresholds">Upload a dataset to see numeric colour thresholds.</div>
+    <label style="display:flex;align-items:center;gap:8px"><input id="showTrail" type="checkbox" checked style="width:auto"> Show position trail</label>
+    <button id="center">Fit dataset / center on rover</button>
     <button id="reload" class="secondary">Reload cloud history</button>
   </section>
+
+  <section class="card">
+    <h2>Upload recorded dataset</h2>
+    <label for="datasetFile">Choose CSV dataset</label>
+    <input id="datasetFile" type="file" accept=".csv,text/csv">
+    <small class="help">CSV must contain latitude + longitude, or x_m + y_m with a map origin set. Every numeric measurement column can be selected as a heatmap.</small>
+    <div id="datasetStatus" class="status" style="margin-top:9px">No dataset uploaded.</div>
+    <button id="clearDataset" class="secondary" type="button">Clear uploaded dataset</button>
+  </section>
+
+
+
 
   <section class="card">
     <h2>Cloud status</h2>
     <div class="status" id="cloud">Waiting for telemetry…</div>
     <small id="count">0 feeds loaded</small>
-    <small class="help-text" id="lastUpdate"></small>
+    <small class="help" id="lastUpdate"></small>
   </section>
 
   <section class="card">
-    <small class="help-text">
-      This firmware configuration uploads MQ-4 and MQ-7. Heat intensity uses
-      raw ADC response (0–4095), not calibrated gas concentration in ppm.
-      GPS-free position is estimated using IMU and wheel encoders; wheel slip
-      and sensor drift can cause accumulated position error.
-    </small>
+    <small class="help">MQ sensor readings are raw ADC values unless calibrated; they are not automatically ppm. DHT11 temperature and humidity heatmaps use the live cloud fields Temperature_C and Humidity_percent. The uploaded mine-safety sample is synthetic test data, not real mine observations. GPS-free rover positions can drift due to wheel slip and sensor error.</small>
   </section>
 </aside>
-
 <div id="map"></div>
 </main>
+  <section class="ai-widget" id="aiAssistantCard" aria-label="Groq AI assistant">
+    <h2><span style="font-size:16px">✦</span> Groq AI assistant</h2>
+    <p class="ai-intro">Ask questions about current Consentium readings or the uploaded CSV. AI answers are informational and are not a certified gas alarm.</p>
+    <div class="ai-suggestions">
+      <button type="button" data-ai-prompt="Summarise the current sensor readings and explain anything unusual.">Summarise readings</button>
+      <button type="button" data-ai-prompt="Which measurement is highest in the current dataset?">Find highest value</button>
+      <button type="button" data-ai-prompt="Explain the selected heatmap parameter and its spatial pattern.">Explain heatmap</button>
+    </div>
+    <div class="ai-chat" id="aiChat" aria-live="polite">
+      <div class="ai-msg assistant">Hello! I can help interpret your rover telemetry and uploaded measurement data. Select a data source and ask a question.</div>
+    </div>
+    <div class="ai-compose">
+      <textarea id="aiQuestion" placeholder="Ask about methane, CO, DHT11, hotspots…" aria-label="Ask Groq AI"></textarea>
+      <button id="aiSend" type="button">Send</button>
+    </div>
+    <small class="help" id="aiStatus">AI connection is checked when you send a message.</small>
+  </section>
+<button type="button" id="aiFab" class="ai-fab" aria-label="Open Groq AI assistant" aria-expanded="false" title="Open Groq AI">✦</button>
+
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-
 <script>
 "use strict";
 
-// -------------------- Map initialization --------------------
-const map = L.map("map").setView([20.5937, 78.9629], 5);
+const $ = id => document.getElementById(id);
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: "&copy; OpenStreetMap contributors"
+// System is the default. Explicit Light/Dark choices are remembered locally.
+const THEME_STORAGE_KEY = "gasRoverThemeMode";
+const themeSelect = $("themeMode");
+function applyTheme(mode) {
+  const selected = ["system","light","dark"].includes(mode) ? mode : "system";
+  const systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const resolved = selected === "system" ? (systemDark ? "dark" : "light") : selected;
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.style.colorScheme = resolved;
+  themeSelect.value = selected;
+}
+function loadThemePreference() {
+  let saved = "system";
+  try { saved = localStorage.getItem(THEME_STORAGE_KEY) || "system"; } catch (_) {}
+  applyTheme(saved);
+}
+themeSelect.addEventListener("change", () => {
+  const mode = themeSelect.value;
+  try { localStorage.setItem(THEME_STORAGE_KEY, mode); } catch (_) {}
+  applyTheme(mode);
+});
+if (window.matchMedia) {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
+    if (themeSelect.value === "system") applyTheme("system");
+  });
+}
+loadThemePreference();
+
+const map = L.map("map").setView([20.5937,78.9629],5);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+  maxZoom:19, attribution:"&copy; OpenStreetMap contributors"
 }).addTo(map);
 
-const roverTrail = L.polyline([], {
-  color: "#267cff",
-  weight: 3
-}).addTo(map);
+const roverTrail = L.polyline([],{color:"#267cff",weight:2,opacity:.75}).addTo(map);
+const heatPalettes = {
+  greenRed:{0.05:"#16a34a",0.50:"#facc15",1.00:"#ef4444"},
+  bluePurple:{0.05:"#2563eb",0.50:"#22d3ee",1.00:"#a855f7"},
+  purpleYellow:{0.05:"#7e22ce",0.50:"#ec4899",1.00:"#facc15"},
+  blueRed:{0.05:"#2563eb",0.50:"#f8fafc",1.00:"#dc2626"},
+  cyanOrange:{0.05:"#06b6d4",0.50:"#84cc16",1.00:"#f97316"},
+  mono:{0.05:"#111827",0.50:"#2563eb",1.00:"#f8fafc"}
+};
 
-const heatLayer = L.heatLayer([], {
-  radius: 27,
-  blur: 20,
-  maxZoom: 18,
-  // Explicit green -> yellow -> red heat intensity gradient.
-  gradient: {
-    0.20: "#22c55e",
-    0.55: "#facc15",
-    1.00: "#ef4444"
-  }
-}).addTo(map);
-
+let heatLayer = null;
+if (typeof L.heatLayer !== "function") {
+  $("status").innerHTML = '<span class="dot bad"></span>Heatmap library failed to load. Check internet access and reload.';
+} else {
+  heatLayer = L.heatLayer([],{
+    radius:8,blur:5,maxZoom:19,minOpacity:0.18,max:1,
+    gradient:heatPalettes.greenRed
+  }).addTo(map);
+}
 let roverMarker = null;
 let lastData = null;
-let initialMapFitDone = false;
+let uploadedDataset = null;
+let uploadedFileName = "";
+let lastMapBounds = null;
+let lastValidPoints = [];
 
-const $ = (id) => document.getElementById(id);
-
-// IMPORTANT: do not turn null/empty values into zero.
-// Number(null) is 0 in JavaScript, which would create false coordinates.
-function number(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
+function number(value){
+  if(value===null || value===undefined || String(value).trim()==="") return null;
+  const n=Number(value);
+  return Number.isFinite(n)?n:null;
 }
-
-function formatValue(value, decimals = 2) {
-  const n = number(value);
-  return n === null ? "—" : n.toFixed(decimals);
+function fmt(value,decimals=2){
+  const n=number(value);
+  return n===null?"—":n.toFixed(decimals);
 }
-
-function getOrigin() {
+function setStatus(kind,message){
+  const cls=kind==="ok"?"ok":kind==="bad"?"bad":"";
+  $("status").innerHTML='<span class="dot '+cls+'"></span>'+message;
+}
+function getOrigin(){
   return {
-    lat: number(localStorage.getItem("originLat")),
-    lon: number(localStorage.getItem("originLon")),
-    heading: number(localStorage.getItem("originHeading")) ?? 0
+    lat:number(localStorage.getItem("originLat")),
+    lon:number(localStorage.getItem("originLon")),
+    heading:number(localStorage.getItem("originHeading"))??0
   };
 }
-
-// The ESP32 firmware's xEastM and yNorthM are already east/north world
-// offsets. Do not rotate them by the initial heading a second time.
-function getFeedCoordinates(feed) {
-  const lat = number(feed.latitude);
-  const lon = number(feed.longitude);
-
-  // Prefer coordinates calculated and uploaded by the ESP32, if available.
-  if (lat !== null && lon !== null &&
-      Math.abs(lat) <= 90 && Math.abs(lon) <= 180 &&
-      !(lat === 0 && lon === 0)) {
-    return [lat, lon];
+function getFeedCoordinates(feed){
+  if(!feed) return null;
+  const lat=number(feed.latitude),lon=number(feed.longitude);
+  if(lat!==null && lon!==null && Math.abs(lat)<=90 && Math.abs(lon)<=180 && !(lat===0&&lon===0)){
+    return [lat,lon];
   }
-
-  const origin = getOrigin();
-  const xEast = number(feed.x_m);
-  const yNorth = number(feed.y_m);
-
-  if (origin.lat === null || origin.lon === null ||
-      xEast === null || yNorth === null) {
-    return null;
-  }
-
-  const latitude = origin.lat + yNorth / 111320;
-  const cosLatitude = Math.cos(origin.lat * Math.PI / 180);
-
-  if (Math.abs(cosLatitude) < 0.000001) {
-    return null;
-  }
-
-  const longitude = origin.lon + xEast / (111320 * cosLatitude);
-
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
-      Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
-    return null;
-  }
-
-  return [latitude, longitude];
+  const o=getOrigin(),x=number(feed.x_m),y=number(feed.y_m);
+  if(o.lat===null||o.lon===null||x===null||y===null) return null;
+  const cos=Math.cos(o.lat*Math.PI/180);
+  if(Math.abs(cos)<1e-6) return null;
+  const result=[o.lat+y/111320,o.lon+x/(111320*cos)];
+  return Math.abs(result[0])<=90&&Math.abs(result[1])<=180?result:null;
 }
-
-// -------------------- Status and telemetry rendering --------------------
-function setStatus(kind, message) {
-  const dotClass = kind === "ok" ? "ok" : kind === "bad" ? "bad" : "";
-  $("status").innerHTML =
-    '<span class="dot ' + dotClass + '"></span>' + message;
-}
-
-function renderTelemetry(data) {
-  const feeds = Array.isArray(data.feeds) ? data.feeds : [];
-  const latest = data.latest || feeds[feeds.length - 1] || null;
-
-  $("count").textContent = feeds.length + " feeds loaded";
-
-  if (data.last_error) {
-    $("cloud").textContent = "Consentium error: " + data.last_error;
-  } else if (latest) {
-    $("cloud").textContent =
-      "Consentium connected · Latest feed: " +
-      (latest.timestamp || "timestamp unavailable");
-  } else {
-    $("cloud").textContent =
-      "Backend connected, but no telemetry feeds were returned.";
+function parseCSV(text){
+  const rows=[]; let row=[],field="",quoted=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(ch==='"'){
+      if(quoted&&text[i+1]==='"'){field+='"';i++;}
+      else quoted=!quoted;
+    }else if(ch===","&&!quoted){row.push(field.trim());field="";}
+    else if((ch==="\n"||ch==="\r")&&!quoted){
+      if(ch==="\r"&&text[i+1]==="\n")i++;
+      row.push(field.trim());
+      if(row.some(v=>v!==""))rows.push(row);
+      row=[];field="";
+    }else field+=ch;
   }
-
-  $("lastUpdate").textContent = data.last_success
-    ? "Backend last successful poll: " + data.last_success
-    : "";
-
-  if (!latest) {
-    $("mq4").textContent = "—";
-    $("mq7").textContent = "—";
-    $("temp").textContent = "—";
-    $("hum").textContent = "—";
-    $("x").textContent = "—";
-    $("y").textContent = "—";
-    $("heading").textContent = "—";
-    return;
-  }
-
-  $("mq4").textContent = formatValue(latest.mq4_raw, 0);
-  $("mq7").textContent = formatValue(latest.mq7_raw, 0);
-
-  const temperature = number(latest.temperature);
-  const humidity = number(latest.humidity);
-
-  $("temp").textContent =
-    temperature === null ? "—" : temperature.toFixed(1) + " °C";
-  $("hum").textContent =
-    humidity === null ? "—" : humidity.toFixed(1) + " %";
-
-  $("x").textContent = formatValue(latest.x_m);
-  $("y").textContent = formatValue(latest.y_m);
-
-  const heading = number(latest.heading_deg);
-  $("heading").textContent =
-    heading === null ? "—" : heading.toFixed(1) + "°";
-
-  renderMap(data, latest);
+  row.push(field.trim());
+  if(row.some(v=>v!==""))rows.push(row);
+  if(rows.length<2)throw new Error("CSV must contain a header and at least one data row.");
+  const headers=rows[0].map(h=>h.replace(/^\uFEFF/,"").trim());
+  return rows.slice(1).map(values=>{
+    const item={};
+    headers.forEach((h,i)=>item[h]=values[i]??"");
+    return item;
+  });
 }
-
-// -------------------- Heatmap and rover position --------------------
-function renderMap(data, latest) {
-  const feeds = Array.isArray(data.feeds) ? data.feeds : [];
-  const selectedGas = $("layer").value;
-
-  const heatPoints = [];
-  const trailPoints = [];
-
-  for (const feed of feeds) {
-    const position = getFeedCoordinates(feed);
-    if (!position) continue;
-
-    trailPoints.push(position);
-
-    const rawReading = number(feed[selectedGas]);
-
-    if (rawReading !== null) {
-      // Scale ESP32 12-bit ADC response to Leaflet heat intensity.
-      const intensity = Math.max(0, Math.min(1, rawReading / 4095));
-
-      // Ignore exact zero so that zero readings do not create visible heat.
-      if (intensity > 0) {
-        heatPoints.push([
-          position[0],
-          position[1],
-          intensity
-        ]);
-      }
+function canonicalHeader(value){return String(value).trim().toLowerCase().replace(/[\s\-]+/g,"_");}
+function getAny(row,names){
+  for(const name of names){
+    const target=canonicalHeader(name);
+    const key=Object.keys(row).find(k=>canonicalHeader(k)===target);
+    if(key!==undefined && row[key]!=="" && row[key]!==null) return row[key];
+  }
+  return null;
+}
+function parseCoordinate(value,kind){
+  if(value===null||value===undefined||String(value).trim()==="")return null;
+  if(typeof value==="number")return value;
+  let s=String(value).trim().toUpperCase();
+  const direction=s.match(/[NSEW]/);
+  s=s.replace(/[NSEW]/g,"").trim();
+  let n=Number(s);
+  if(!Number.isFinite(n))return null;
+  if(direction && /[SW]/.test(direction[0]))n=-Math.abs(n);
+  if(kind==="lat"&&Math.abs(n)>90)return null;
+  if(kind==="lon"&&Math.abs(n)>180)return null;
+  return n;
+}
+function normalizeCSVRow(row){
+  const out={};
+  for(const [key,value] of Object.entries(row)){
+    const n=number(value);
+    out[canonicalHeader(key)]=n===null?value:n;
+  }
+  out.timestamp=getAny(row,["timestamp","updated_at","datetime","date"]);
+  out.latitude=parseCoordinate(getAny(row,["latitude","latitude_est","lat"]),"lat");
+  out.longitude=parseCoordinate(getAny(row,["longitude","longitude_est","lon","lng"]),"lon");
+  out.x_m=number(getAny(row,["x_m","position_x_east_m","position_x_m","x_east_m"]));
+  out.y_m=number(getAny(row,["y_m","position_y_north_m","position_y_m","y_north_m"]));
+  out.heading_deg=number(getAny(row,["heading_deg","heading"]));
+  out.mq4_raw=number(getAny(row,["mq4_raw","mq4_adc_raw","mq4_adc","mq4"]));
+  out.mq7_raw=number(getAny(row,["mq7_raw","mq7_adc_raw","mq7_adc","mq7"]));
+  out.temperature=number(getAny(row,["temperature","temperature_c","temp_c"]));
+  out.humidity=number(getAny(row,["humidity","humidity_percent","humidity_pct"]));
+  return out;
+}
+const coordinateNames=new Set([
+  "latitude","latitude_est","lat","longitude","longitude_est","lon","lng",
+  "x_m","position_x_east_m","position_x_m","x_east_m",
+  "y_m","position_y_north_m","position_y_m","y_north_m",
+  "z_m","heading","heading_deg","timestamp","updated_at","datetime","date",
+  "record_id","month","day","year"
+]);
+function numericColumns(rows){
+  if(!rows.length)return [];
+  return Object.keys(rows[0]).filter(key=>{
+    if(coordinateNames.has(canonicalHeader(key)))return false;
+    let found=false;
+    for(const row of rows){
+      const v=row[key];
+      if(v!==""&&v!==null&&v!==undefined&&Number.isFinite(Number(v))){found=true;break;}
+    }
+    return found;
+  });
+}
+function percentile(sorted,p){
+  if(!sorted.length)return 0;
+  const index=(sorted.length-1)*p,lo=Math.floor(index),hi=Math.ceil(index);
+  if(lo===hi)return sorted[lo];
+  return sorted[lo]+(sorted[hi]-sorted[lo])*(index-lo);
+}
+function applyPalette(){
+  if(!heatLayer)return;
+  const palette=heatPalettes[$("palette").value]||heatPalettes.greenRed;
+  heatLayer.setOptions({gradient:palette});
+  const colours=Object.values(palette);
+  $("heatLegend").innerHTML=
+    '<span><i class="swatch" style="background:'+colours[0]+'"></i>Lower</span>'+
+    '<span><i class="swatch" style="background:'+colours[1]+'"></i>Medium</span>'+
+    '<span><i class="swatch" style="background:'+colours[2]+'"></i>Higher</span>';
+}
+function updateHeatSize(){
+  if(!heatLayer)return;
+  const radius=Number($("radius").value),blur=Number($("blur").value);
+  $("radiusValue").textContent=radius;
+  $("blurValue").textContent=blur;
+  heatLayer.setOptions({radius,blur});
+}
+function fitPositions(points){
+  if(!points.length)return;
+  const bounds=L.latLngBounds(points);
+  lastMapBounds=bounds;
+  if(points.length===1)map.setView(points[0],18);
+  else map.fitBounds(bounds,{padding:[35,35],maxZoom:19});
+}
+function renderMap(feeds,latest,source){
+  if(!heatLayer)return;
+  const selected=$("layer").value;
+  const points=[],trail=[];
+  const measurements=[];
+  for(const feed of feeds){
+    const pos=getFeedCoordinates(feed);
+    if(!pos)continue;
+    trail.push(pos);
+    const v=number(feed[selected]);
+    if(v!==null)measurements.push({pos,value:v});
+  }
+  const rawValues=measurements.map(x=>x.value).sort((a,b)=>a-b);
+  let low=0,high=1;
+  if(rawValues.length){
+    if($("scaleMode").value==="percentile"){
+      low=percentile(rawValues,0.05);high=percentile(rawValues,0.95);
+    }else{
+      low=rawValues[0];high=rawValues[rawValues.length-1];
     }
   }
+  const range=high-low;
+  for(const item of measurements){
+    let intensity=range>0?(item.value-low)/range:0.5;
+    intensity=Math.max(0,Math.min(1,intensity));
+    // Keep zero/low values visible but avoid painting every point at full strength.
+    intensity=0.08+0.92*intensity;
+    points.push([item.pos[0],item.pos[1],intensity]);
+  }
+  heatLayer.setLatLngs(points);
+  const showTrail=$("showTrail").checked;
+  roverTrail.setLatLngs(showTrail?trail:[]);
+  roverTrail.setStyle({opacity:source==="csv"&&showTrail?0.55:0.75});
+  lastValidPoints=trail;
 
-  heatLayer.setLatLngs(heatPoints);
-  roverTrail.setLatLngs(trailPoints);
+  if(rawValues.length){
+    const fmtNum=v=>Number(v).toLocaleString(undefined,{maximumFractionDigits:4});
+    $("thresholds").textContent=
+      "Valid heat points: "+measurements.length+" / "+feeds.length+
+      " · Data min: "+fmtNum(rawValues[0])+
+      " · 5%: "+fmtNum(percentile(rawValues,.05))+
+      " · 50%: "+fmtNum(percentile(rawValues,.5))+
+      " · 95%: "+fmtNum(percentile(rawValues,.95))+
+      " · Max: "+fmtNum(rawValues[rawValues.length-1])+
+      " · Active scale: "+fmtNum(low)+" to "+fmtNum(high);
+  }else{
+    $("thresholds").textContent="No valid numeric readings found in this parameter.";
+  }
 
-  const currentPosition = getFeedCoordinates(latest);
-
-  if (currentPosition) {
-    if (!roverMarker) {
-      roverMarker = L.circleMarker(currentPosition, {
-        radius: 8,
-        color: "#ffffff",
-        weight: 2,
-        fillColor: "#267cff",
-        fillOpacity: 1
-      }).addTo(map).bindPopup("Estimated rover position");
-    } else {
-      roverMarker.setLatLng(currentPosition);
+  const current=getFeedCoordinates(latest);
+  if(source==="live"&&current){
+    if(!roverMarker)roverMarker=L.circleMarker(current,{radius:7,color:"#fff",weight:2,fillColor:"#267cff",fillOpacity:1}).addTo(map).bindPopup("Estimated rover position");
+    else roverMarker.setLatLng(current);
+  }
+  if(source==="csv"){
+    if(roverMarker){map.removeLayer(roverMarker);roverMarker=null;}
+    if(trail.length)fitPositions(trail);
+  }else if(current&&!lastMapBounds){
+    map.setView(current,18);
+  }
+}
+function populateLayerOptions(columns,selected){
+  const selector=$("layer");
+  selector.innerHTML="";
+  columns.forEach(column=>{
+    const opt=document.createElement("option");
+    opt.value=column;opt.textContent=column;selector.appendChild(opt);
+  });
+  if(selected&&columns.includes(selected))selector.value=selected;
+}
+async function loadCSVFile(file){
+  if(!file)return;
+  if(!file.name.toLowerCase().endsWith(".csv"))throw new Error("Please select a CSV file.");
+  if(file.size>30*1024*1024)throw new Error("CSV file is larger than 30 MB.");
+  const parsed=parseCSV(await file.text());
+  const rows=parsed.map(normalizeCSVRow);
+  if(!rows.length)throw new Error("The CSV contains no data rows.");
+  const geoCount=rows.filter(r=>r.latitude!==null&&r.longitude!==null).length;
+  const xyCount=rows.filter(r=>r.x_m!==null&&r.y_m!==null).length;
+  if(!geoCount&&!xyCount)throw new Error("Dataset needs latitude + longitude, or x_m + y_m columns.");
+  if(!geoCount&&xyCount){
+    const origin=getOrigin();
+    if(origin.lat===null||origin.lon===null)throw new Error("This CSV uses x_m/y_m. Set the map origin latitude and longitude first.");
+  }
+  const columns=numericColumns(parsed);
+  if(!columns.length)throw new Error("No numeric measurement columns found.");
+  uploadedDataset=rows;
+  uploadedFileName=file.name;
+  populateLayerOptions(columns,columns.includes("methane_ch4_vol_percent")?"methane_ch4_vol_percent":columns[0]);
+  $("mapSource").value="csv";
+  $("parameterHelp").textContent="Choose any numeric measurement column from "+file.name+".";
+  $("datasetStatus").style.color="#26c281";
+  $("datasetStatus").textContent=rows.length.toLocaleString()+" rows loaded · "+columns.length+" numeric parameters · "+(geoCount?geoCount+" GPS rows":xyCount+" X/Y rows")+".";
+  $("count").textContent=rows.length.toLocaleString()+" CSV rows loaded";
+  renderMap(rows,rows[rows.length-1],"csv");
+  $("cloud").textContent="Displaying uploaded CSV: "+file.name;
+}
+function setLiveOptions(){
+  const liveColumns = [
+    ["mq4_raw","MQ-4 raw ADC"],
+    ["mq7_raw","MQ-7 raw ADC"],
+    ["temperature","DHT11 temperature (°C)"],
+    ["humidity","DHT11 humidity (%)"]
+  ];
+  const selector = $("layer");
+  const previous = selector.value;
+  selector.innerHTML = "";
+  liveColumns.forEach(([value,label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    selector.appendChild(option);
+  });
+  selector.value = liveColumns.some(([value]) => value === previous) ? previous : "mq4_raw";
+  $("parameterHelp").textContent =
+    "Live cloud heatmaps: MQ-4, MQ-7, DHT11 temperature and DHT11 humidity. DHT11 readings appear after the ESP32 uploads Temperature_C and Humidity_percent.";
+}
+function renderTelemetry(data){
+  const feeds=Array.isArray(data.feeds)?data.feeds:[];
+  const latest=data.latest||feeds[feeds.length-1]||null;
+  $("count").textContent=feeds.length+" live feeds loaded";
+  $("cloud").textContent=data.last_error?"Consentium error: "+data.last_error:
+    latest?"Consentium connected · Latest feed: "+(latest.timestamp||"timestamp unavailable"):
+    "Backend connected, but no telemetry feeds were returned.";
+  $("lastUpdate").textContent=data.last_success?"Last successful poll: "+data.last_success:"";
+  if(latest){
+    $("mq4").textContent=fmt(latest.mq4_raw,0);
+    $("mq7").textContent=fmt(latest.mq7_raw,0);
+    const t = number(latest.temperature);
+    const h = number(latest.humidity);
+    $("temp").textContent = t===null ? "—" : t.toFixed(1)+" °C";
+    $("hum").textContent = h===null ? "—" : h.toFixed(1)+" %";
+    $("x").textContent=fmt(latest.x_m);
+    $("y").textContent=fmt(latest.y_m);
+    $("heading").textContent=fmt(latest.heading_deg,1)+"°";
+  }
+  if($("mapSource").value==="live"){
+    renderMap(feeds,latest,"live");
+  }
+}
+async function refreshTelemetry(){
+  try{
+    const response=await fetch("/api/telemetry",{cache:"no-store"});
+    if(!response.ok)throw new Error("Backend returned HTTP "+response.status);
+    const data=await response.json();lastData=data;
+    if(data.last_error)setStatus("bad","Backend connected · Consentium API error");
+    else if(data.configured===false)setStatus("bad","Backend connected · API keys not configured");
+    else setStatus("ok","Backend connected");
+    if($("mapSource").value==="live")renderTelemetry(data);
+    else{
+      $("cloud").textContent="CSV mode active · Live Consentium connection "+(data.last_error?"has an API error":"is available");
+      $("lastUpdate").textContent=data.last_success?"Last successful poll: "+data.last_success:"";
     }
-
-    if (!initialMapFitDone) {
-      map.setView(currentPosition, 18);
-      initialMapFitDone = true;
-    }
-  } else if (trailPoints.length === 0) {
-    $("cloud").textContent +=
-      " · Set map origin and upload X/Y position telemetry to plot heat.";
+  }catch(error){
+    console.error("Telemetry refresh failed:",error);
+    setStatus("bad","Backend unreachable");
+    if($("mapSource").value==="live")$("cloud").textContent=error.message;
   }
 }
 
-// -------------------- Backend API --------------------
-async function refreshTelemetry() {
-  try {
-    const response = await fetch("/api/telemetry", {
-      method: "GET",
-      cache: "no-store"
-    });
-
-    if (!response.ok) {
-      throw new Error("Backend returned HTTP " + response.status);
-    }
-
-    const data = await response.json();
-
-    lastData = data;
-
-    if (data.last_error) {
-      setStatus("bad", "Backend connected · Consentium API error");
-    } else if (data.configured === false) {
-      setStatus("bad", "Backend connected · API keys not configured");
-    } else {
-      setStatus("ok", "Backend connected");
-    }
-
-    renderTelemetry(data);
-
-  } catch (error) {
-    console.error("Telemetry refresh failed:", error);
-    setStatus("bad", "Backend unreachable");
-    $("cloud").textContent = error.message;
-  }
-}
-
-// -------------------- User controls --------------------
-$("setOrigin").addEventListener("click", () => {
-  const latitude = number($("lat").value);
-  const longitude = number($("lon").value);
-  const heading = number($("heading0").value);
-
-  if (latitude === null || longitude === null ||
-      Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
-    alert("Please enter valid starting latitude and longitude.");
-    return;
-  }
-
-  if (heading === null || heading < 0 || heading >= 360) {
-    alert("Initial heading must be from 0 to less than 360 degrees.");
-    return;
-  }
-
-  localStorage.setItem("originLat", String(latitude));
-  localStorage.setItem("originLon", String(longitude));
-  localStorage.setItem("originHeading", String(heading));
-
-  initialMapFitDone = false;
-
-  // The ESP32's X/Y coordinate system is already east/north.
-  // The heading is used by the ESP32 when its origin is initialized.
-  map.setView([latitude, longitude], 18);
-
-  if (lastData) {
-    renderTelemetry(lastData);
-  }
-
-  alert("Map origin saved in this browser.");
+$("setOrigin").addEventListener("click",()=>{
+  const lat=number($("lat").value),lon=number($("lon").value),heading=number($("heading0").value);
+  if(lat===null||lon===null||Math.abs(lat)>90||Math.abs(lon)>180){alert("Enter valid latitude and longitude.");return;}
+  if(heading===null||heading<0||heading>=360){alert("Heading must be from 0 to less than 360 degrees.");return;}
+  localStorage.setItem("originLat",String(lat));
+  localStorage.setItem("originLon",String(lon));
+  localStorage.setItem("originHeading",String(heading));
+  if(uploadedDataset&&$("mapSource").value==="csv")renderMap(uploadedDataset,uploadedDataset[uploadedDataset.length-1],"csv");
+  else if(lastData)renderTelemetry(lastData);
+  map.setView([lat,lon],18);
 });
-
-$("layer").addEventListener("change", () => {
-  if (lastData) renderTelemetry(lastData);
+$("palette").addEventListener("change",applyPalette);
+$("radius").addEventListener("input",updateHeatSize);
+$("blur").addEventListener("input",updateHeatSize);
+$("scaleMode").addEventListener("change",()=>{
+  if($("mapSource").value==="csv"&&uploadedDataset)renderMap(uploadedDataset,uploadedDataset[uploadedDataset.length-1],"csv");
+  else if(lastData)renderTelemetry(lastData);
 });
-
-$("center").addEventListener("click", () => {
-  if (roverMarker) {
-    map.setView(roverMarker.getLatLng(), 18);
-  } else {
-    const origin = getOrigin();
-    if (origin.lat !== null && origin.lon !== null) {
-      map.setView([origin.lat, origin.lon], 18);
-    } else {
-      alert("Set the map origin first.");
-    }
+$("showTrail").addEventListener("change",()=>{
+  if($("mapSource").value==="csv"&&uploadedDataset)renderMap(uploadedDataset,uploadedDataset[uploadedDataset.length-1],"csv");
+  else if(lastData)renderTelemetry(lastData);
+});
+$("layer").addEventListener("change",()=>{
+  if($("mapSource").value==="csv"&&uploadedDataset)renderMap(uploadedDataset,uploadedDataset[uploadedDataset.length-1],"csv");
+  else if(lastData)renderTelemetry(lastData);
+});
+$("mapSource").addEventListener("change",()=>{
+  if($("mapSource").value==="csv"){
+    if(!uploadedDataset){$("cloud").textContent="Upload a CSV dataset first.";return;}
+    renderMap(uploadedDataset,uploadedDataset[uploadedDataset.length-1],"csv");
+  }else{
+    setLiveOptions();
+    if(lastData)renderTelemetry(lastData);
   }
 });
-
-$("reload").addEventListener("click", async () => {
-  const button = $("reload");
-  button.disabled = true;
-  button.textContent = "Reloading…";
-
-  try {
-    const response = await fetch("/api/reload", { method: "POST" });
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(message || "History reload failed");
-    }
+$("center").addEventListener("click",()=>{
+  if($("mapSource").value==="csv"&&lastValidPoints.length){fitPositions(lastValidPoints);return;}
+  if(roverMarker){map.setView(roverMarker.getLatLng(),18);return;}
+  const o=getOrigin();
+  if(o.lat!==null&&o.lon!==null)map.setView([o.lat,o.lon],18);
+  else alert("No rover position available. Set the map origin or upload GPS coordinates.");
+});
+$("reload").addEventListener("click",async()=>{
+  const btn=$("reload");btn.disabled=true;btn.textContent="Reloading…";
+  try{
+    const r=await fetch("/api/reload",{method:"POST"});
+    if(!r.ok)throw new Error(await r.text());
     await refreshTelemetry();
-  } catch (error) {
-    console.error("History reload failed:", error);
-    $("cloud").textContent = "Reload error: " + error.message;
-  } finally {
-    button.disabled = false;
-    button.textContent = "Reload cloud history";
+  }catch(e){$("cloud").textContent="Reload error: "+e.message;}
+  finally{btn.disabled=false;btn.textContent="Reload cloud history";}
+});
+$("datasetFile").addEventListener("change",async event=>{
+  const file=event.target.files&&event.target.files[0];if(!file)return;
+  $("datasetStatus").textContent="Reading dataset…";$("datasetStatus").style.color="#9aabc2";
+  try{await loadCSVFile(file);}
+  catch(error){
+    uploadedDataset=null;
+    $("datasetStatus").textContent="Dataset error: "+error.message;
+    $("datasetStatus").style.color="#ed6262";
+    console.error("Dataset upload failed:",error);
   }
 });
+$("clearDataset").addEventListener("click",()=>{
+  uploadedDataset=null;uploadedFileName="";$("datasetFile").value="";
+  $("datasetStatus").textContent="No dataset uploaded. Map is using live cloud history.";
+  $("datasetStatus").style.color="#9aabc2";$("mapSource").value="live";
+  setLiveOptions();if(lastData)renderTelemetry(lastData);
+  else if(heatLayer)heatLayer.setLatLngs([]);
+});
+const saved=getOrigin();
+if(saved.lat!==null)$("lat").value=saved.lat;
+if(saved.lon!==null)$("lon").value=saved.lon;
+$("heading0").value=saved.heading;
 
-// Restore saved origin fields when this browser is reopened.
-const savedOrigin = getOrigin();
-if (savedOrigin.lat !== null) $("lat").value = savedOrigin.lat;
-if (savedOrigin.lon !== null) $("lon").value = savedOrigin.lon;
-$("heading0").value = savedOrigin.heading;
+const aiHistory = [];
+function escapeAIHTML(value){
+  return String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+function formatAIAnswer(text){
+  const lines=String(text||"").replace(/\r/g,"").split("\n");
+  let htmlOut="",listType=null;
+  const closeList=()=>{if(listType){htmlOut+=listType==="ul"?"</ul>":"</ol>";listType=null;}};
+  const inline=s=>escapeAIHTML(s)
+    .replace(/`([^`]+)`/g,"<code>$1</code>")
+    .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g,"<em>$1</em>");
+  for(const raw of lines){
+    const line=raw.trim();
+    if(!line){closeList();continue;}
+    const bullet=line.match(/^[-*]\s+(.+)/);
+    const numbered=line.match(/^\d+[.)]\s+(.+)/);
+    if(bullet||numbered){
+      const type=bullet?"ul":"ol";
+      if(listType!==type){closeList();htmlOut+=type==="ul"?"<ul>":"<ol>";listType=type;}
+      htmlOut+="<li>"+inline((bullet||numbered)[1])+"</li>";
+      continue;
+    }
+    closeList();
+    const heading=line.match(/^#{1,3}\s+(.+)/);
+    if(heading) htmlOut+="<h3>"+inline(heading[1])+"</h3>";
+    else htmlOut+="<p>"+inline(line.replace(/^>\s?/,""))+"</p>";
+  }
+  closeList();
+  return htmlOut;
+}
+function appendAIMessage(role,text){
+  const node=document.createElement("div");
+  node.className="ai-msg "+role;
+  if(role==="assistant") node.innerHTML=formatAIAnswer(text);
+  else node.textContent=text;
+  $("aiChat").appendChild(node);
+  $("aiChat").scrollTop=$("aiChat").scrollHeight;
+}
+function buildAIContext(){
+  const source=$("mapSource").value;
+  const parameter=$("layer").value;
+  if(source==="csv"&&uploadedDataset){
+    const rows=uploadedDataset;
+    const values=rows.map(r=>number(r[parameter])).filter(v=>v!==null);
+    const coords=rows.map(getFeedCoordinates).filter(Boolean);
+    const summary={
+      source:"uploaded_csv",filename:uploadedFileName,total_rows:rows.length,
+      selected_parameter:parameter,valid_values:values.length,
+      min:values.length?Math.min(...values):null,
+      max:values.length?Math.max(...values):null,
+      mean:values.length?values.reduce((a,b)=>a+b,0)/values.length:null,
+      sample_rows:rows.slice(0,30),
+      coordinate_bounds:coords.length?{
+        min_lat:Math.min(...coords.map(p=>p[0])),max_lat:Math.max(...coords.map(p=>p[0])),
+        min_lon:Math.min(...coords.map(p=>p[1])),max_lon:Math.max(...coords.map(p=>p[1]))
+      }:null
+    };
+    return summary;
+  }
+  const feeds=(lastData&&Array.isArray(lastData.feeds))?lastData.feeds:[];
+  return {
+    source:"consentium_live",
+    latest:lastData?.latest||null,
+    recent_feeds:feeds.slice(-30),
+    selected_parameter:parameter
+  };
+}
+async function sendAIMessage(text){
+  const question=(text||$("aiQuestion").value).trim();
+  if(!question)return;
+  appendAIMessage("user",question);
+  $("aiQuestion").value="";
+  $("aiSend").disabled=true;
+  $("aiSend").textContent="…";
+  $("aiStatus").textContent="Asking Groq AI…";
+  try{
+    const response=await fetch("/api/ai/chat",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({question,history:aiHistory.slice(-8),context:buildAIContext()})
+    });
+    const payload=await response.json();
+    if(!response.ok)throw new Error(payload.detail||payload.error||("HTTP "+response.status));
+    const answer=payload.answer||"The AI returned an empty response.";
+    appendAIMessage("assistant",answer);
+    aiHistory.push({role:"user",content:question},{role:"assistant",content:answer});
+    $("aiStatus").textContent="Model: "+(payload.model||"Groq")+". Context: "+($("mapSource").value==="csv"?"uploaded CSV":"Consentium live telemetry")+".";
+  }catch(error){
+    appendAIMessage("assistant","I couldn't reach Groq AI: "+error.message+"\nCheck GROQ_API_KEY, backend logs and network connectivity.");
+    $("aiStatus").textContent="AI request failed.";
+  }finally{
+    $("aiSend").disabled=false;
+    $("aiSend").textContent="Send";
+  }
+}
+// Sidebar collapse is available only on laptop/desktop widths (above 800px).
+const dashboardMain=document.querySelector("main");
+const sidebarToggle=$("sidebarToggle");
+const sidebarStorageKey="gasRoverSidebarCollapsed";
+const desktopSidebarQuery=window.matchMedia("(min-width: 801px)");
+function setSidebarCollapsed(collapsed,save=true){
+  const shouldCollapse=desktopSidebarQuery.matches && collapsed;
+  dashboardMain.classList.toggle("sidebar-collapsed",shouldCollapse);
+  sidebarToggle.setAttribute("aria-expanded",String(!shouldCollapse));
+  sidebarToggle.title=shouldCollapse?"Open dashboard sidebar":"Close dashboard sidebar";
+  if(save && desktopSidebarQuery.matches){
+    try{localStorage.setItem(sidebarStorageKey,String(shouldCollapse));}catch(_){}
+  }
+  setTimeout(()=>{if(typeof map!=="undefined"&&map)map.invalidateSize({pan:false});},280);
+}
+let savedSidebarCollapsed=false;
+try{savedSidebarCollapsed=localStorage.getItem(sidebarStorageKey)==="true";}catch(_){}
+setSidebarCollapsed(desktopSidebarQuery.matches && savedSidebarCollapsed,false);
+desktopSidebarQuery.addEventListener?.("change",event=>{
+  if(!event.matches){
+    dashboardMain.classList.remove("sidebar-collapsed");
+    sidebarToggle.setAttribute("aria-expanded","true");
+    sidebarToggle.title="Close dashboard sidebar";
+  }else{
+    let saved=false;
+    try{saved=localStorage.getItem(sidebarStorageKey)==="true";}catch(_){}
+    setSidebarCollapsed(saved,false);
+  }
+  setTimeout(()=>{if(typeof map!=="undefined"&&map)map.invalidateSize({pan:false});},280);
+});
+sidebarToggle.addEventListener("click",()=>{
+  if(!desktopSidebarQuery.matches)return;
+  setSidebarCollapsed(!dashboardMain.classList.contains("sidebar-collapsed"));
+});
 
-// Refresh the dashboard every 3 seconds. The backend polls Consentium
-// independently according to POLL_SECONDS in its .env file.
+const aiWidget=$("aiAssistantCard"),aiFab=$("aiFab");
+function setAIWidgetOpen(open){
+  aiWidget.classList.toggle("open",open);
+  aiFab.classList.toggle("is-open",open);
+  aiFab.textContent=open?"×":"✦";
+  aiFab.setAttribute("aria-expanded",String(open));
+  aiFab.setAttribute("aria-label",open?"Close Groq AI assistant":"Open Groq AI assistant");
+  aiFab.title=open?"Close Groq AI":"Open Groq AI";
+  if(open) setTimeout(()=>$("aiQuestion").focus(),120);
+}
+aiFab.addEventListener("click",()=>setAIWidgetOpen(!aiWidget.classList.contains("open")));
+$("aiClose").addEventListener("click",()=>setAIWidgetOpen(false));
+document.addEventListener("keydown",event=>{if(event.key==="Escape")setAIWidgetOpen(false);});
+
+$("aiSend").addEventListener("click",()=>sendAIMessage());
+$("aiQuestion").addEventListener("keydown",event=>{
+  if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendAIMessage();}
+});
+document.querySelectorAll("[data-ai-prompt]").forEach(button=>{
+  button.addEventListener("click",()=>sendAIMessage(button.dataset.aiPrompt));
+});
+
+applyPalette();updateHeatSize();setLiveOptions();
 refreshTelemetry();
-setInterval(refreshTelemetry, 3000);
+setInterval(refreshTelemetry,3000);
+
+// Leaflet needs an explicit size refresh after responsive layout changes,
+// device rotation, browser chrome collapse, or opening/closing split views.
+let mapResizeTimer = null;
+function refreshMapSize(){
+  clearTimeout(mapResizeTimer);
+  mapResizeTimer = setTimeout(() => {
+    map.invalidateSize({pan:false});
+    if($("mapSource").value==="csv" && lastValidPoints.length){
+      const bounds=L.latLngBounds(lastValidPoints);
+      if(bounds.isValid()) map.fitBounds(bounds,{padding:[24,24],maxZoom:19});
+    }
+  },180);
+}
+window.addEventListener("resize",refreshMapSize,{passive:true});
+window.addEventListener("orientationchange",()=>setTimeout(refreshMapSize,350),{passive:true});
+if(window.visualViewport) window.visualViewport.addEventListener("resize",refreshMapSize,{passive:true});
 </script>
 </body>
 </html>

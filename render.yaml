@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: consentium-gas-rover
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: CONSENTIUM_BASE_URL
+        value: https://api.consentiumiot.com
+      - key: CONSENTIUM_RECEIVE_KEY
+        sync: false
+      - key: CONSENTIUM_BOARD_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: POLL_SECONDS
+        value: "5"
+      - key: HISTORY_LIMIT
+        value: "1000"
