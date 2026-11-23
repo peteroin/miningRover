@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: consentium-gas-rover
+    name: rover
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
