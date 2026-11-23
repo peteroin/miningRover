@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Consentium IoT | Gas Monitoring Rover</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131e30'/%3E%3Ccircle cx='20' cy='46' r='7' fill='%239aabc2'/%3E%3Ccircle cx='44' cy='46' r='7' fill='%239aabc2'/%3E%3Crect x='16' y='28' width='32' height='14' rx='4' fill='%233984ff'/%3E%3Crect x='28' y='20' width='8' height='10' rx='2' fill='%233984ff'/%3E%3Ccircle cx='32' cy='16' r='4' fill='%2326c281'/%3E%3Cpath d='M28 8c2-3 6-3 8 0M26 4c3-4 9-4 12 0' fill='none' stroke='%23e0a33a' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<title>Gas Monitoring Rover</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{color-scheme:dark;--bg:#0b1220;--panel:#131e30;--muted:#9aabc2;--line:#26364d;--blue:#3984ff}
@@ -575,11 +576,30 @@ html[data-theme="light"] .ai-close{color:#263b55;background:#edf2f8}
   }
 }
 
+
+/* Rover Intelligence — floating chat redesign */
+.ai-widget{width:min(430px,calc(100vw - 28px));height:min(650px,calc(100dvh - 116px));max-height:calc(100dvh - 116px);border-radius:22px;border:1px solid var(--line);background:var(--panel);box-shadow:0 28px 85px rgba(0,0,0,.35);isolation:isolate}
+.ai-widget-header{flex:0 0 auto;padding:16px 17px;justify-content:flex-start;gap:11px;background:linear-gradient(110deg,rgba(47,122,235,.16),rgba(30,194,174,.10));border-bottom:1px solid var(--line)}
+.ai-brand-icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:14px;background:linear-gradient(140deg,#287bdc,#22b6a7);color:white;font-size:24px;box-shadow:0 7px 20px rgba(28,139,195,.22)}
+.ai-brand-copy{display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}.ai-brand-copy strong{font:700 16px 'Space Grotesk',sans-serif;letter-spacing:-.02em;color:var(--text)}.ai-brand-copy small{font-size:11px;color:var(--muted)}.ai-online-dot{display:inline-block;width:7px;height:7px;background:#22c99b;border-radius:50%;margin-right:4px;box-shadow:0 0 0 3px rgba(34,201,155,.12)}
+.ai-widget .ai-close{flex:0 0 34px;width:34px;height:34px;min-height:34px;font-size:21px;border-radius:11px;margin-left:auto}
+.ai-widget-body{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden;padding:14px 15px 0}
+.ai-welcome{display:flex;gap:10px;padding:13px;border:1px solid var(--line);border-radius:15px;background:rgba(110,155,190,.07)}.ai-welcome-icon{display:grid;place-items:center;flex:0 0 31px;height:31px;border-radius:10px;background:rgba(46,174,179,.15);color:var(--cyan);font-size:20px}.ai-welcome strong{font-size:12px;color:var(--text)}.ai-welcome p{margin:5px 0 0;font-size:11px;line-height:1.55;color:var(--muted)}
+.ai-widget .ai-suggestions{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:7px;padding:0;margin:13px 0}.ai-widget .ai-suggestions button{width:auto;min-height:32px;padding:7px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(90,138,188,.10);font-size:10px;font-weight:700;color:var(--text)}
+.ai-widget .ai-chat{flex:1;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;padding:6px 2px 16px;gap:12px;scrollbar-width:thin}
+.ai-widget .ai-msg{font-size:12px;line-height:1.65;padding:11px 13px;box-shadow:0 3px 10px rgba(0,0,0,.04)}.ai-widget .ai-msg.assistant{max-width:94%;align-self:flex-start;background:rgba(50,174,161,.09);border:1px solid rgba(50,174,161,.17);border-radius:5px 15px 15px 15px}.ai-widget .ai-msg.user{max-width:88%;align-self:flex-end;background:linear-gradient(135deg,#246bc7,#2457a6);border:0;border-radius:15px 5px 15px 15px;color:white}.ai-widget .ai-msg.user strong{color:white}
+.ai-widget-footer{flex:0 0 auto;padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--panel)}
+.ai-widget .ai-compose{display:flex;align-items:flex-end;gap:8px;padding:0}.ai-widget .ai-compose textarea{flex:1;min-width:0;min-height:48px;max-height:110px;resize:vertical;padding:13px 12px;border-radius:13px;font-size:12px;line-height:1.5}.ai-widget .ai-compose button{flex:0 0 auto;width:80px;min-height:46px;border-radius:12px;margin:0;font-size:12px;background:linear-gradient(135deg,#277fdb,#1b9eaf)}
+.ai-widget #aiStatus{padding:9px 2px 0;font-size:10px;line-height:1.5;color:var(--muted)}
+.ai-fab{font-family:'Space Grotesk',sans-serif}
+html[data-theme="light"] .ai-widget .ai-msg.assistant{background:#eaf8f6;color:#20334a}html[data-theme="light"] .ai-widget .ai-msg.user{color:#fff}html[data-theme="light"] .ai-welcome{background:#f5f9fe}html[data-theme="light"] .ai-widget-footer{background:#fff}
+@media(max-width:600px){.ai-widget{right:10px;bottom:76px;width:calc(100vw - 20px);height:min(620px,calc(100dvh - 95px));max-height:calc(100dvh - 95px);border-radius:18px}.ai-widget-header{padding:12px}.ai-widget-body{padding:10px 11px 0}.ai-widget .ai-suggestions{margin:10px 0}.ai-widget .ai-suggestions button{font-size:10px}.ai-widget-footer{padding:10px}.ai-welcome{padding:10px}}
+
 </style>
 </head>
 <body>
 <header>
-  <h1>Consentium IoT · Gas Monitoring Rover</h1>
+  <h1>Gas Monitoring Rover</h1>
   <div class="header-actions">
     <label class="theme-label" for="themeMode">Appearance</label>
     <select id="themeMode" aria-label="Choose appearance">
@@ -689,22 +709,27 @@ html[data-theme="light"] .ai-close{color:#263b55;background:#edf2f8}
 </aside>
 <div id="map"></div>
 </main>
-  <section class="ai-widget" id="aiAssistantCard" aria-label="Groq AI assistant">
-    <h2><span style="font-size:16px">✦</span> Groq AI assistant</h2>
-    <p class="ai-intro">Ask questions about current Consentium readings or the uploaded CSV. AI answers are informational and are not a certified gas alarm.</p>
-    <div class="ai-suggestions">
-      <button type="button" data-ai-prompt="Summarise the current sensor readings and explain anything unusual.">Summarise readings</button>
-      <button type="button" data-ai-prompt="Which measurement is highest in the current dataset?">Find highest value</button>
-      <button type="button" data-ai-prompt="Explain the selected heatmap parameter and its spatial pattern.">Explain heatmap</button>
+  <section class="ai-widget" id="aiAssistantCard" aria-label="Groq AI assistant" role="dialog" aria-modal="false" aria-labelledby="aiTitle">
+    <div class="ai-widget-header">
+      <div class="ai-brand-icon" aria-hidden="true">✦</div>
+      <div class="ai-brand-copy"><strong id="aiTitle">Rover Intelligence</strong><small><span class="ai-online-dot"></span> AI</small></div>
+      <button type="button" id="aiClose" class="ai-close" aria-label="Close AI assistant">×</button>
     </div>
-    <div class="ai-chat" id="aiChat" aria-live="polite">
-      <div class="ai-msg assistant">Hello! I can help interpret your rover telemetry and uploaded measurement data. Select a data source and ask a question.</div>
+    <div class="ai-widget-body">
+      <div class="ai-welcome"><span class="ai-welcome-icon">✧</span><div><strong>Explore your sensor data</strong><p>Ask about live telemetry, uploaded CSV measurements, or heatmap patterns. Responses are informational, not certified safety alerts.</p></div></div>
+      <div class="ai-suggestions" aria-label="Suggested questions">
+        <button type="button" data-ai-prompt="Summarise the current sensor readings and explain anything unusual.">✦ Summarise readings</button>
+        <button type="button" data-ai-prompt="Which measurement is highest in the current dataset?">↗ Highest value</button>
+        <button type="button" data-ai-prompt="Explain the selected heatmap parameter and its spatial pattern.">◉ Explain heatmap</button>
+      </div>
+      <div class="ai-chat" id="aiChat" aria-live="polite" aria-relevant="additions">
+        <div class="ai-msg assistant"><p>Hello! I can help interpret your rover telemetry and uploaded measurement data. Select a data source and ask a question.</p></div>
+      </div>
     </div>
-    <div class="ai-compose">
-      <textarea id="aiQuestion" placeholder="Ask about methane, CO, DHT11, hotspots…" aria-label="Ask Groq AI"></textarea>
-      <button id="aiSend" type="button">Send</button>
+    <div class="ai-widget-footer">
+      <div class="ai-compose"><textarea id="aiQuestion" rows="2" placeholder="Ask about sensors or hotspots…" aria-label="Ask Groq AI"></textarea><button id="aiSend" type="button" aria-label="Send message">Send ↗</button></div>
+      <small class="help" id="aiStatus">AI connection is checked when you send a message.</small>
     </div>
-    <small class="help" id="aiStatus">AI connection is checked when you send a message.</small>
   </section>
 <button type="button" id="aiFab" class="ai-fab" aria-label="Open Groq AI assistant" aria-expanded="false" title="Open Groq AI">✦</button>
 
@@ -1205,13 +1230,13 @@ function buildAIContext(){
     const summary={
       source:"uploaded_csv",filename:uploadedFileName,total_rows:rows.length,
       selected_parameter:parameter,valid_values:values.length,
-      min:values.length?Math.min(...values):null,
-      max:values.length?Math.max(...values):null,
+      min:values.length?values.reduce((a,b)=>Math.min(a,b),Infinity):null,
+      max:values.length?values.reduce((a,b)=>Math.max(a,b),-Infinity):null,
       mean:values.length?values.reduce((a,b)=>a+b,0)/values.length:null,
       sample_rows:rows.slice(0,30),
       coordinate_bounds:coords.length?{
-        min_lat:Math.min(...coords.map(p=>p[0])),max_lat:Math.max(...coords.map(p=>p[0])),
-        min_lon:Math.min(...coords.map(p=>p[1])),max_lon:Math.max(...coords.map(p=>p[1]))
+        min_lat:coords.reduce((a,p)=>Math.min(a,p[0]),Infinity),max_lat:coords.reduce((a,p)=>Math.max(a,p[0]),-Infinity),
+        min_lon:coords.reduce((a,p)=>Math.min(a,p[1]),Infinity),max_lon:coords.reduce((a,p)=>Math.max(a,p[1]),-Infinity)
       }:null
     };
     return summary;
@@ -1238,7 +1263,10 @@ async function sendAIMessage(text){
       body:JSON.stringify({question,history:aiHistory.slice(-8),context:buildAIContext()})
     });
     const payload=await response.json();
-    if(!response.ok)throw new Error(payload.detail||payload.error||("HTTP "+response.status));
+    if(!response.ok){
+      const detail=payload.detail||payload.error||("HTTP "+response.status);
+      throw new Error(typeof detail==="string"?detail:JSON.stringify(detail));
+    }
     const answer=payload.answer||"The AI returned an empty response.";
     appendAIMessage("assistant",answer);
     aiHistory.push({role:"user",content:question},{role:"assistant",content:answer});
@@ -1248,7 +1276,7 @@ async function sendAIMessage(text){
     $("aiStatus").textContent="AI request failed.";
   }finally{
     $("aiSend").disabled=false;
-    $("aiSend").textContent="Send";
+    $("aiSend").textContent="Send ↗";
   }
 }
 // Sidebar collapse is available only on laptop/desktop widths (above 800px).
@@ -1297,7 +1325,8 @@ function setAIWidgetOpen(open){
   if(open) setTimeout(()=>$("aiQuestion").focus(),120);
 }
 aiFab.addEventListener("click",()=>setAIWidgetOpen(!aiWidget.classList.contains("open")));
-$("aiClose").addEventListener("click",()=>setAIWidgetOpen(false));
+const aiCloseButton = $("aiClose");
+if (aiCloseButton) aiCloseButton.addEventListener("click",()=>setAIWidgetOpen(false));
 document.addEventListener("keydown",event=>{if(event.key==="Escape")setAIWidgetOpen(false);});
 
 $("aiSend").addEventListener("click",()=>sendAIMessage());
